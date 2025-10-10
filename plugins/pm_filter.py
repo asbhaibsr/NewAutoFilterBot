@@ -29,6 +29,13 @@ logger.setLevel(logging.ERROR)
 BUTTONS = {}
 SPELL_CHECK = {}
 
+async def schedule_delete(message):
+    """Deletes the message after 300 seconds (5 minutes)."""
+    await asyncio.sleep(300)
+    try:
+        await message.delete()
+    except Exception as e:
+        logger.warning(f"Error deleting message: {e}")
 
 @Client.on_message(filters.group & filters.text & filters.incoming)
 async def give_filter(client, message):
@@ -363,12 +370,13 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
                 return
             else:
-                await client.send_cached_media(
+                sent_msg = await client.send_cached_media(
                     chat_id=query.from_user.id,
                     file_id=file_id,
                     caption=f_caption,
                     protect_content=True if ident == "filep" else False 
                 )
+                asyncio.create_task(schedule_delete(sent_msg)) # NEW: Schedule for deletion
                 await query.answer('Check PM, I have sent files in pm', show_alert=True)
         except UserIsBlocked:
             await query.answer('Unblock the bot mahn !', show_alert=True)
@@ -399,12 +407,13 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if f_caption is None:
             f_caption = f"{title}"
         await query.answer()
-        await client.send_cached_media(
+        sent_msg = await client.send_cached_media(
             chat_id=query.from_user.id,
             file_id=file_id,
             caption=f_caption,
             protect_content=True if ident == 'checksubp' else False
         )
+        asyncio.create_task(schedule_delete(sent_msg)) # NEW: Schedule for deletion
     elif query.data == "pages":
         await query.answer()
     elif query.data == "start":
@@ -643,7 +652,23 @@ async def auto_filter(client, msg, spoll=False):
                 if settings["spell_check"]:
                     return await advantage_spell_chok(msg)
                 else:
-                    return
+                    # UPDATED: Custom message when no movie found with suggestions and Google button
+                    query_url = message.text.replace(" ", "+")
+                    buttons = [[
+                        InlineKeyboardButton(text="🔍 Google पर स्पेलिंग चेक करें", url=f"https://www.google.com/search?q={query_url}")
+                    ]]
+                    
+                    return await message.reply_text(
+                        f"**⚠️ क्षमा करें! यह मूवी ( `{message.text}` ) हमारे डेटाबेस में नहीं मिली।**\n\n"
+                        f"**कृपया:**\n"
+                        f"1. **सही स्पेलिंग** डालकर दोबारा प्रयास करें।\n"
+                        f"2. ऊपर दिए **Google बटन** से स्पेलिंग चेक करें।\n\n"
+                        f"**👉 अगर मूवी फिर भी न मिले, तो आप इन बोट्स पर चेक कर सकते हैं:**\n"
+                        f"• @asfilter_bot\n"
+                        f"• @AsMoviesSearch_roBot",
+                        reply_markup=InlineKeyboardMarkup(buttons),
+                        disable_web_page_preview=True
+                    )
         else:
             return
     else:
@@ -690,6 +715,11 @@ async def auto_filter(client, msg, spoll=False):
             [InlineKeyboardButton(text="🗓 1/1", callback_data="pages")]
         )
     # End Pagination Buttons Logic
+    
+    # NEW: Check Bot PM Button
+    if settings['botpm']: # Check if bot PM is enabled
+        btn.insert(0, [InlineKeyboardButton(text="📥 Check Bot PM 📥", url=f"https://t.me/{temp.U_NAME}")])
+    # End NEW: Check Bot PM Button
     
     imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
     TEMPLATE = settings['template']
