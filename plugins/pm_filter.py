@@ -83,30 +83,35 @@ async def next_page(bot, query):
             for file in files
         ]
 
-    if 0 < offset <= 10:
-        off_set = 0
-    elif offset == 0:
-        off_set = None
-    else:
-        off_set = offset - 10
-    if n_offset == 0:
-        btn.append(
-            [InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
-             InlineKeyboardButton(f"📃 Pages {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}",
-                                  callback_data="pages")]
-        )
-    elif off_set is None:
-        btn.append(
-            [InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
-             InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")])
-    else:
-        btn.append(
-            [
-                InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
-                InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
-                InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")
-            ],
-        )
+    # 👇 आपकी इमेज के अनुसार Pagination Buttons का नया लॉजिक 👇
+    current_page = math.ceil(int(offset) / 10) + 1
+    total_pages = math.ceil(total / 10)
+    
+    # Back button calculation
+    off_set = offset - 10 if offset > 0 else None
+
+    # Next button calculation
+    next_btn = f"next_{req}_{key}_{n_offset}" if n_offset != 0 else None
+
+    # Build the pagination row
+    pagination_buttons = []
+    
+    # ⏪ BACK Button
+    if off_set is not None:
+        pagination_buttons.append(InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"))
+    
+    # 🗓 Pages Button
+    pagination_buttons.append(InlineKeyboardButton(f"🗓 Pages {current_page} / {total_pages}", callback_data="pages"))
+    
+    # NEXT ⏩ Button
+    if next_btn is not None:
+        pagination_buttons.append(InlineKeyboardButton("NEXT ⏩", callback_data=next_btn))
+
+    # Append the pagination row
+    if pagination_buttons:
+        btn.append(pagination_buttons)
+    # 👆 आपकी इमेज के अनुसार Pagination Buttons का नया लॉजिक 👆
+
     try:
         await query.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup(btn)
@@ -661,18 +666,22 @@ async def auto_filter(client, msg, spoll=False):
             for file in files
         ]
 
+    # 👇 आपकी इमेज के अनुसार पहले पेज के लिए Pagination Buttons का नया लॉजिक 👇
     if offset != "":
         key = f"{message.chat.id}-{message.id}"
         BUTTONS[key] = search
         req = message.from_user.id if message.from_user else 0
+        total_pages = math.ceil(int(total_results) / 10)
         btn.append(
-            [InlineKeyboardButton(text=f"🗓 1/{math.ceil(int(total_results) / 10)}", callback_data="pages"),
+            [InlineKeyboardButton(text=f"🗓 1 / {total_pages}", callback_data="pages"),
              InlineKeyboardButton(text="NEXT ⏩", callback_data=f"next_{req}_{key}_{offset}")]
         )
     else:
         btn.append(
             [InlineKeyboardButton(text="🗓 1/1", callback_data="pages")]
         )
+    # 👆 आपकी इमेज के अनुसार पहले पेज के लिए Pagination Buttons का नया लॉजिक 👆
+    
     imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
     TEMPLATE = settings['template']
     if imdb:
