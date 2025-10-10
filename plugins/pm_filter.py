@@ -83,7 +83,7 @@ async def next_page(bot, query):
             for file in files
         ]
 
-    # 👇 आपकी इमेज के अनुसार Pagination Buttons का नया लॉजिक 👇
+    # Pagination Buttons Logic
     current_page = math.ceil(int(offset) / 10) + 1
     total_pages = math.ceil(total / 10)
     
@@ -110,7 +110,7 @@ async def next_page(bot, query):
     # Append the pagination row
     if pagination_buttons:
         btn.append(pagination_buttons)
-    # 👆 आपकी इमेज के अनुसार Pagination Buttons का नया लॉजिक 👆
+    # End Pagination Buttons Logic
 
     try:
         await query.edit_message_reply_markup(
@@ -629,7 +629,16 @@ async def auto_filter(client, msg, spoll=False):
             return
         if 2 < len(message.text) < 100:
             search = message.text
+            
+            # 👇 Searching Sticker Added Here 👇
+            # Sticker ID: CAACAgUAAxkBAAEEZo1o6SlcFV3q8zLbRtOOyNAVornRiAACmgADyJRkFCxl4eFc7yVqHgQ
+            searching = await message.reply_sticker("CAACAgUAAxkBAAEEZo1o6SlcFV3q8zLbRtOOyNAVornRiAACmgADyJRkFCxl4eFc7yVqHgQ")
+            
             files, offset, total_results = await get_search_results(search.lower(), offset=0, filter=True)
+            
+            # 👇 Delete Sticker After Search 👇
+            await searching.delete() 
+
             if not files:
                 if settings["spell_check"]:
                     return await advantage_spell_chok(msg)
@@ -666,7 +675,7 @@ async def auto_filter(client, msg, spoll=False):
             for file in files
         ]
 
-    # 👇 आपकी इमेज के अनुसार पहले पेज के लिए Pagination Buttons का नया लॉजिक 👇
+    # Pagination Buttons Logic for first page
     if offset != "":
         key = f"{message.chat.id}-{message.id}"
         BUTTONS[key] = search
@@ -680,7 +689,7 @@ async def auto_filter(client, msg, spoll=False):
         btn.append(
             [InlineKeyboardButton(text="🗓 1/1", callback_data="pages")]
         )
-    # 👆 आपकी इमेज के अनुसार पहले पेज के लिए Pagination Buttons का नया लॉजिक 👆
+    # End Pagination Buttons Logic
     
     imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
     TEMPLATE = settings['template']
