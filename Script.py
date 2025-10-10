@@ -14,8 +14,8 @@ class script(object):
 - As Bhai Bsr-FreeFilterBot is a open source project. 
 - Source - https://youtube.com/asbhaibsr
 
-<b>DEVS:</b>
-- <a href=https://t.me/asbhai_bsr>TmAs Bhai Bsr</a>"""
+<b>My boss:</b>
+- <a href=https://t.me/asbhai_bsr>As Bhai Bsr</a>"""
     MANUELFILTER_TXT = """Help: <b>Filters</b>
 
 - Filter is the feature were users can set automated replies for a particular keyword and Asbhai_bsr will respond whenever a keyword is found the message
