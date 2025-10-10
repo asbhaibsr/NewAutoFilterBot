@@ -4,7 +4,7 @@ import random
 import asyncio
 from Script import script
 from pyrogram import Client, filters, enums
-from pyrogram.errors import ChatAdminRequired, FloodWait
+from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, ChannelInvalid # Added PeerIdInvalid, ChannelInvalid
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database.ia_filterdb import Media, get_file_details, unpack_new_file_id
 from database.users_chats_db import db
@@ -69,12 +69,22 @@ async def start(client, message):
             parse_mode=enums.ParseMode.HTML
         )
         return
+        
+    # FIX: Force-sub Check with Error Handling
     if AUTH_CHANNEL and not await is_subscribed(client, message):
         try:
-            invite_link = await client.create_chat_invite_link(int(AUTH_CHANNEL))
-        except ChatAdminRequired:
-            logger.error("Make sure Bot is admin in Forcesub channel")
+            # FIX: Convert AUTH_CHANNEL to int explicitly and handle errors
+            auth_channel_id = int(AUTH_CHANNEL)
+            invite_link = await client.create_chat_invite_link(auth_channel_id)
+        except (ChatAdminRequired, PeerIdInvalid, ChannelInvalid, ValueError) as e:
+            logger.error(f"Force-sub setup error for AUTH_CHANNEL {AUTH_CHANNEL}: {e}")
+            await message.reply_text(
+                "⚠️ **Force-Subscription Setup Error**\n\n"
+                "Please ensure the `AUTH_CHANNEL` ID is correct (e.g., `-100...`) "
+                "and that the bot is an **administrator** in that channel with **Invite Link** permission."
+            )
             return
+
         btn = [
             [
                 InlineKeyboardButton(
@@ -97,6 +107,7 @@ async def start(client, message):
             parse_mode=enums.ParseMode.MARKDOWN
             )
         return
+        
     if len(message.command) == 2 and message.command[1] in ["subscribe", "error", "okay", "help"]:
         buttons = [[
             InlineKeyboardButton('➕ Add Me To Your Groups ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
@@ -300,11 +311,16 @@ async def channel_info(bot, message):
 
     text = '📑 **Indexed channels/groups**\n'
     for channel in channels:
-        chat = await bot.get_chat(channel)
-        if chat.username:
-            text += '\n@' + chat.username
-        else:
-            text += '\n' + chat.title or chat.first_name
+        try:
+            chat = await bot.get_chat(channel)
+            if chat.username:
+                text += '\n@' + chat.username
+            else:
+                text += '\n' + chat.title or chat.first_name
+        except Exception as e:
+            logger.error(f"Error getting chat info for channel {channel}: {e}")
+            text += f'\n(Error getting info for {channel})'
+
 
     text += f'\n\n**Total:** {len(CHANNELS)}'
 
