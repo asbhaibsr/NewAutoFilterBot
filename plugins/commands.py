@@ -37,9 +37,12 @@ async def start(client, message):
             await client.send_message(LOG_CHANNEL, script.LOG_TEXT_G.format(message.chat.title, message.chat.id, total, "Unknown"))       
             await db.add_chat(message.chat.id, message.chat.title)
         return 
+    
+    # PM User DB update
     if not await db.is_user_exist(message.from_user.id):
         await db.add_user(message.from_user.id, message.from_user.first_name)
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
+        
     if len(message.command) != 2:
         buttons = [[
             InlineKeyboardButton('➕ Add Me To Your Groups ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
@@ -246,6 +249,26 @@ async def start(client, message):
         caption=f_caption,
         protect_content=True if pre == 'filep' else False,
         )
+
+
+@Client.on_message(filters.private & filters.text & filters.incoming & ~filters.command(["start", "help", "settings", "id", "status", "batch", "connect", "disconnect", "stats", "set_template"]))
+async def pm_text_search_handler(client, message):
+    """Handles text messages in PM that are not commands, by suggesting to join the group."""
+    
+    # Custom Message and Button for PM Search
+    buttons = [[
+        InlineKeyboardButton('🎬 Free Movie Search Group 🍿', url='https://t.me/freemoviesearchgroup')
+    ]]
+    reply_markup = InlineKeyboardMarkup(buttons)
+    
+    text = f"**❌ आप यहाँ (PM) में मूवी सर्च नहीं कर सकते।**\n\nकृपया हमारे **फ्री मूवी सर्च ग्रुप** को जॉइन करें और वहाँ मूवी सर्च करें। 👇"
+    
+    await message.reply_text(
+        text=text,
+        reply_markup=reply_markup,
+        disable_web_page_preview=True,
+        parse_mode=enums.ParseMode.MARKDOWN
+    )
                     
 
 @Client.on_message(filters.command('channel') & filters.user(ADMINS))
