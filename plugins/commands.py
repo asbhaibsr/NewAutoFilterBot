@@ -4,7 +4,7 @@ import random
 import asyncio
 from Script import script
 from pyrogram import Client, filters, enums
-from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, ChannelInvalid # Added PeerIdInvalid, ChannelInvalid
+from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, ChannelInvalid
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database.ia_filterdb import Media, get_file_details, unpack_new_file_id
 from database.users_chats_db import db
@@ -14,13 +14,15 @@ from database.connections_mdb import active_connection
 import re
 import json
 import base64
+
 logger = logging.getLogger(__name__)
 
 BATCH_FILES = {}
 
-async def schedule_delete(message):
-    """Deletes the message after 300 seconds (5 minutes)."""
-    await asyncio.sleep(300)
+# MODIFIED: यह फंक्शन अब किसी भी मैसेज को दिए गए समय के बाद डिलीट कर सकता है
+async def schedule_delete(message, delay_seconds=300):
+    """Deletes the message after a specified delay."""
+    await asyncio.sleep(delay_seconds)
     try:
         await message.delete()
     except Exception as e:
@@ -31,7 +33,7 @@ async def start(client, message):
     if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
         buttons = [
             [
-                InlineKeyboardButton('🤖 Updates', url='https://t.me/TeamEvamaria')
+                InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
             ],
             [
                 InlineKeyboardButton('ℹ️ Help', url=f"https://t.me/{temp.U_NAME}?start=help"),
@@ -39,14 +41,13 @@ async def start(client, message):
             ]
         reply_markup = InlineKeyboardMarkup(buttons)
         await message.reply(script.START_TXT.format(message.from_user.mention if message.from_user else message.chat.title, temp.U_NAME, temp.B_NAME), reply_markup=reply_markup)
-        await asyncio.sleep(2) # 😢 https://github.com/EvamariaTG/EvaMaria/blob/master/plugins/p_ttishow.py#L17 😬 wait a bit, before checking.
+        await asyncio.sleep(2)
         if not await db.get_chat(message.chat.id):
             total=await client.get_chat_members_count(message.chat.id)
             await client.send_message(LOG_CHANNEL, script.LOG_TEXT_G.format(message.chat.title, message.chat.id, total, "Unknown"))       
             await db.add_chat(message.chat.id, message.chat.title)
         return 
     
-    # PM User DB update
     if not await db.is_user_exist(message.from_user.id):
         await db.add_user(message.from_user.id, message.from_user.first_name)
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
@@ -56,7 +57,7 @@ async def start(client, message):
             InlineKeyboardButton('➕ Add Me To Your Groups ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
             ],[
             InlineKeyboardButton('🔍 Search', switch_inline_query_current_chat=''),
-            InlineKeyboardButton('🤖 Updates', url='https://t.me/TeamEvamaria')
+            InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
             ],[
             InlineKeyboardButton('ℹ️ Help', callback_data='help'),
             InlineKeyboardButton('😊 About', callback_data='about')
@@ -70,18 +71,14 @@ async def start(client, message):
         )
         return
         
-    # FIX: Force-sub Check with Error Handling
     if AUTH_CHANNEL and not await is_subscribed(client, message):
         try:
-            # FIX: Convert AUTH_CHANNEL to int explicitly and handle errors
             auth_channel_id = int(AUTH_CHANNEL)
             invite_link = await client.create_chat_invite_link(auth_channel_id)
         except (ChatAdminRequired, PeerIdInvalid, ChannelInvalid, ValueError) as e:
             logger.error(f"Force-sub setup error for AUTH_CHANNEL {AUTH_CHANNEL}: {e}")
             await message.reply_text(
-                "⚠️ **Force-Subscription Setup Error**\n\n"
-                "Please ensure the `AUTH_CHANNEL` ID is correct (e.g., `-100...`) "
-                "and that the bot is an **administrator** in that channel with **Invite Link** permission."
+                "⚠️ **Force-Subscription Setup Error**\n\nPlease ensure the `AUTH_CHANNEL` ID is correct (e.g., `-100...`) and that the bot is an **administrator** in that channel with **Invite Link** permission."
             )
             return
 
@@ -113,7 +110,7 @@ async def start(client, message):
             InlineKeyboardButton('➕ Add Me To Your Groups ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
             ],[
             InlineKeyboardButton('🔍 Search', switch_inline_query_current_chat=''),
-            InlineKeyboardButton('🤖 Updates', url='https://t.me/TeamEvamaria')
+            InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
             ],[
             InlineKeyboardButton('ℹ️ Help', callback_data='help'),
             InlineKeyboardButton('😊 About', callback_data='about')
@@ -126,6 +123,7 @@ async def start(client, message):
             parse_mode=enums.ParseMode.HTML
         )
         return
+        
     data = message.command[1]
     try:
         pre, file_id = data.split('_', 1)
@@ -164,8 +162,9 @@ async def start(client, message):
                     file_id=msg.get("file_id"),
                     caption=f_caption,
                     protect_content=msg.get('protect', False),
-                    )
-                asyncio.create_task(schedule_delete(sent_msg)) # NEW: Schedule for deletion
+                )
+                # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+                asyncio.create_task(schedule_delete(sent_msg, 300))
             except FloodWait as e:
                 await asyncio.sleep(e.x)
                 logger.warning(f"Floodwait of {e.x} sec.")
@@ -174,8 +173,9 @@ async def start(client, message):
                     file_id=msg.get("file_id"),
                     caption=f_caption,
                     protect_content=msg.get('protect', False),
-                    )
-                asyncio.create_task(schedule_delete(sent_msg)) # NEW: Schedule for deletion
+                )
+                # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+                asyncio.create_task(schedule_delete(sent_msg, 300))
             except Exception as e:
                 logger.warning(e, exc_info=True)
                 continue
@@ -207,11 +207,13 @@ async def start(client, message):
                     f_caption = getattr(msg, 'caption', file_name)
                 try:
                     sent_msg = await msg.copy(message.chat.id, caption=f_caption, protect_content=True if protect == "/pbatch" else False)
-                    asyncio.create_task(schedule_delete(sent_msg)) # NEW: Schedule for deletion
+                    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+                    asyncio.create_task(schedule_delete(sent_msg, 300))
                 except FloodWait as e:
                     await asyncio.sleep(e.x)
                     sent_msg = await msg.copy(message.chat.id, caption=f_caption, protect_content=True if protect == "/pbatch" else False)
-                    asyncio.create_task(schedule_delete(sent_msg)) # NEW: Schedule for deletion
+                    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+                    asyncio.create_task(schedule_delete(sent_msg, 300))
                 except Exception as e:
                     logger.exception(e)
                     continue
@@ -220,11 +222,13 @@ async def start(client, message):
             else:
                 try:
                     sent_msg = await msg.copy(message.chat.id, protect_content=True if protect == "/pbatch" else False)
-                    asyncio.create_task(schedule_delete(sent_msg)) # NEW: Schedule for deletion
+                    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+                    asyncio.create_task(schedule_delete(sent_msg, 300))
                 except FloodWait as e:
                     await asyncio.sleep(e.x)
                     sent_msg = await msg.copy(message.chat.id, protect_content=True if protect == "/pbatch" else False)
-                    asyncio.create_task(schedule_delete(sent_msg)) # NEW: Schedule for deletion
+                    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+                    asyncio.create_task(schedule_delete(sent_msg, 300))
                 except Exception as e:
                     logger.exception(e)
                     continue
@@ -240,8 +244,9 @@ async def start(client, message):
                 chat_id=message.from_user.id,
                 file_id=file_id,
                 protect_content=True if pre == 'filep' else False,
-                )
-            asyncio.create_task(schedule_delete(msg)) # NEW: Schedule for deletion
+            )
+            # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+            asyncio.create_task(schedule_delete(msg, 300))
             filetype = msg.media
             file = getattr(msg, filetype.value)
             title = file.file_name
@@ -274,10 +279,12 @@ async def start(client, message):
         file_id=file_id,
         caption=f_caption,
         protect_content=True if pre == 'filep' else False,
-        )
-    asyncio.create_task(schedule_delete(sent_msg)) # NEW: Schedule for deletion
+    )
+    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+    asyncio.create_task(schedule_delete(sent_msg, 300))
 
 
+# ... (बाकी का कोड जैसा था वैसा ही रहेगा) ...
 @Client.on_message(filters.private & filters.text & filters.incoming & ~filters.command(["start", "help", "settings", "id", "status", "batch", "connect", "disconnect", "stats", "set_template"]))
 async def pm_text_search_handler(client, message):
     """Handles text messages in PM that are not commands, by suggesting to join the group."""
