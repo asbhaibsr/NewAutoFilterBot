@@ -42,8 +42,7 @@ INDIAN_LANGUAGES = [
 # Season options (S01 to S50 as per your example)
 SEASON_OPTIONS = [f"S{i:02d}" for i in range(1, 51)] 
 
-
-# Enhanced fancy font converter - Simplified for clean buttons, no emojis
+# Enhanced fancy font converter - Clean version without emojis
 def to_fancy_font(text):
     """Converts text to fancy font style, avoiding emojis for clean buttons"""
     mapping = {
@@ -56,7 +55,8 @@ def to_fancy_font(text):
         '0': '𝟶', '1': '𝟷', '2': '𝟸', '3': '𝟹', '4': '𝟺', '5': '𝟻', '6': '𝟼', '7': '𝟽', '8': '𝟾', '9': '𝟿',
         ' ': ' ', '.': '.', ',': ',', '!': '!', '?': '?', '-': '-', '_': '_', '/': '/', '\\': '\\',
         '(': '(', ')': ')', '[': '[', ']': ']', '{': '{', '}': '}', 
-        '✅': '✅', '❌': '❌' # Keep checkmarks as they are
+        '@': '@', '#': '#', '$': '$', '%': '%', '&': '&', '*': '*', '+': '+', '=': '=',
+        ':': ':', ';': ';', '<': '<', '>': '>'
     }
     return ''.join(mapping.get(char, char) for char in text)
 
@@ -76,7 +76,7 @@ def create_filter_buttons(filter_type, key, current_state=None):
     buttons = []
     
     # Back button to return to the main file list
-    back_button = [InlineKeyboardButton(text=to_fancy_font("⏪ Back To Files"), callback_data=f"back_to_files#{key}")]
+    back_button = [InlineKeyboardButton(text=to_fancy_font("Back To Files"), callback_data=f"back_to_files#{key}")]
     
     if filter_type == "quality":
         options = QUALITY_OPTIONS
@@ -149,19 +149,16 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     # --- Start building buttons ---
     btn = []
     
-    # Filter buttons row (New Order: Quality, Language, Season - above Send All)
+    # Filter buttons row - Quality and Language in one line, Session below
     btn.append([
-        InlineKeyboardButton(text=to_fancy_font(f"🎬 Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
-        InlineKeyboardButton(text=to_fancy_font(f"🌐 Language ({current_language or 'None'})"), callback_data=f"open_filter#language#{key}"),
-        InlineKeyboardButton(text=to_fancy_font(f"📺 Season ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}")
+        InlineKeyboardButton(text=to_fancy_font(f"Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
+        InlineKeyboardButton(text=to_fancy_font(f"Language ({current_language or 'None'})"), callback_data=f"open_filter#language#{key}")
     ])
     
-    # Send All Files button
+    # Session and Send All Files buttons in second row
     btn.append([
-        InlineKeyboardButton(
-            text=to_fancy_font("🚀 Send All Files"), 
-            callback_data=f"sendall_{key}"
-        )
+        InlineKeyboardButton(text=to_fancy_font(f"Session ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}"),
+        InlineKeyboardButton(text=to_fancy_font("Send All Files"), callback_data=f"sendall_{key}")
     ])
     
     # File buttons
@@ -169,8 +166,8 @@ async def run_filtered_search(client, query, key, back_to_main=False):
         file_btn = [
             [
                 InlineKeyboardButton(
-                    # APPLY FANCY FONT TO FILE NAME
-                    text=f"📁 {to_fancy_font(file.file_name)}",
+                    # APPLY FANCY FONT TO FILE NAME - FIXED: Regular font for file names
+                    text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
@@ -180,13 +177,13 @@ async def run_filtered_search(client, query, key, back_to_main=False):
         file_btn = [
             [
                 InlineKeyboardButton(
-                    # APPLY FANCY FONT TO FILE NAME
-                    text=f"📂 {to_fancy_font(file.file_name)}",
+                    # APPLY FANCY FONT TO FILE NAME - FIXED: Regular font for file names
+                    text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}',
                 ),
                 InlineKeyboardButton(
                     # APPLY FANCY FONT TO FILE SIZE
-                    text=f"💾 {to_fancy_font(get_size(file.file_size))}",
+                    text=f"{get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}',
                 ),
             ]
@@ -204,16 +201,16 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     
     if offset > 0:
         pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("⏪ Back"), callback_data=f"next_{req}_{key}_{offset-10}")
+            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}")
         )
     
     pagination_buttons.append(
-        InlineKeyboardButton(to_fancy_font(f"📄 {current_page}/{total_pages}"), callback_data="pages")
+        InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages")
     )
     
     if n_offset != 0 and n_offset < total_results:
         pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("Next ⏩"), callback_data=f"next_{req}_{key}_{n_offset}")
+            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}")
         )
     
     if pagination_buttons:
@@ -222,7 +219,7 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     # Check Bot PM button (FIX: Direct user mention, no link)
     btn.append([
         InlineKeyboardButton(
-            text=to_fancy_font("🔍 Check Bot PM"), 
+            text=to_fancy_font("Check Bot PM"), 
             url=f"https://t.me/{temp.U_NAME}" # Correct URL for PM
         )
     ])
@@ -238,18 +235,18 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     # Cleaned up message format as requested
     # FIX: Requested by message structure changed to avoid fancy font link error
     custom_msg = f"""
-**📂 Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
+**Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
 {filters_applied}
 
-**📢 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ:** {user_mention}
-**♾️ Powered By: {chat_title}**
+**Requested By:** {user_mention}
+**Powered By: {chat_title}**
 
-**🍿 Your Movie Files ({total_results}) 👇**
+**Your Movie Files ({total_results})**
 """
     
     try:
         await query.message.edit_text(
-            text=to_fancy_font(custom_msg), 
+            text=custom_msg,  # FIXED: No fancy font for main message
             reply_markup=InlineKeyboardMarkup(btn), 
             parse_mode=enums.ParseMode.MARKDOWN
         )
@@ -315,19 +312,16 @@ async def next_page(bot, query):
     
     btn = []
     
-    # Filter buttons row (New Order)
+    # Filter buttons row - Quality and Language in one line, Session below
     btn.append([
-        InlineKeyboardButton(text=to_fancy_font(f"🎬 Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
-        InlineKeyboardButton(text=to_fancy_font(f"🌐 Language ({current_language or 'None'})"), callback_data=f"open_filter#language#{key}"),
-        InlineKeyboardButton(text=to_fancy_font(f"📺 Season ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}")
+        InlineKeyboardButton(text=to_fancy_font(f"Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
+        InlineKeyboardButton(text=to_fancy_font(f"Language ({current_language or 'None'})"), callback_data=f"open_filter#language#{key}")
     ])
     
-    # Send All Files button
+    # Session and Send All Files buttons in second row
     btn.append([
-        InlineKeyboardButton(
-            text=to_fancy_font("🚀 Send All Files"), 
-            callback_data=f"sendall_{key}"
-        )
+        InlineKeyboardButton(text=to_fancy_font(f"Session ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}"),
+        InlineKeyboardButton(text=to_fancy_font("Send All Files"), callback_data=f"sendall_{key}")
     ])
     
     # File buttons
@@ -335,7 +329,8 @@ async def next_page(bot, query):
         file_btn = [
             [
                 InlineKeyboardButton(
-                    text=f"📁 {to_fancy_font(file.file_name)}",
+                    # FIXED: Regular font for file names
+                    text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
@@ -345,11 +340,12 @@ async def next_page(bot, query):
         file_btn = [
             [
                 InlineKeyboardButton(
-                    text=f"📂 {to_fancy_font(file.file_name)}",
+                    # FIXED: Regular font for file names
+                    text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}',
                 ),
                 InlineKeyboardButton(
-                    text=f"💾 {to_fancy_font(get_size(file.file_size))}",
+                    text=f"{get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}',
                 ),
             ]
@@ -366,25 +362,25 @@ async def next_page(bot, query):
     pagination_buttons = []
     if offset > 0:
         pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("⏪ Back"), callback_data=f"next_{req}_{key}_{offset-10}")
+            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}")
         )
     
     pagination_buttons.append(
-        InlineKeyboardButton(to_fancy_font(f"📄 {current_page}/{total_pages}"), callback_data="pages")
+        InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages")
     )
     
     if n_offset != 0 and n_offset < total:
         pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("Next ⏩"), callback_data=f"next_{req}_{key}_{n_offset}")
+            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}")
         )
     
     if pagination_buttons:
         btn.append(pagination_buttons)
         
-    # Check Bot PM button (FIX: Direct user mention, no link)
+    # Check Bot PM button
     btn.append([
         InlineKeyboardButton(
-            text=to_fancy_font("🔍 Check Bot PM"), 
+            text=to_fancy_font("Check Bot PM"), 
             url=f"https://t.me/{temp.U_NAME}"
         )
     ])
@@ -395,17 +391,17 @@ async def next_page(bot, query):
         chat_title = query.message.chat.title if query.message.chat.title else 'This Group'
         filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
         custom_msg = f"""
-**📂 Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
+**Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
 {filters_applied}
 
-**📢 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ:** {user_mention}
-**♾️ Powered By: {chat_title}**
+**Requested By:** {user_mention}
+**Powered By: {chat_title}**
 
-**🍿 Your Movie Files ({total}) 👇**
+**Your Movie Files ({total})**
 """
         
         await query.message.edit_text(
-            text=to_fancy_font(custom_msg), 
+            text=custom_msg,  # FIXED: No fancy font for main message
             reply_markup=InlineKeyboardMarkup(btn), 
             parse_mode=enums.ParseMode.MARKDOWN
         )
@@ -457,7 +453,7 @@ async def send_all_files(bot, query):
         offset = next_offset
     
     if not all_files:
-        notification = await query.message.reply_text(to_fancy_font("❌ No files found to send with the current filters."))
+        notification = await query.message.reply_text("No files found to send with the current filters.")
         asyncio.create_task(schedule_delete(notification, 10))
         return
     
@@ -497,11 +493,11 @@ async def send_all_files(bot, query):
             await asyncio.sleep(0.5)
             
         except UserIsBlocked:
-            await query.message.reply_text(to_fancy_font("❌ Please unblock the bot first!"))
+            await query.message.reply_text("Please unblock the bot first!")
             return
         except PeerIdInvalid:
-             await query.message.reply_text(to_fancy_font("❌ Please start the bot in private chat first!"), 
-                                           reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(to_fancy_font("▶️ Start Bot"), url=f"https://t.me/{temp.U_NAME}")]])
+             await query.message.reply_text("Please start the bot in private chat first!", 
+                                           reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Start Bot", url=f"https://t.me/{temp.U_NAME}")]])
                                            )
              return
         except Exception as e:
@@ -511,18 +507,14 @@ async def send_all_files(bot, query):
     # Notification
     filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
     notification = await query.message.reply_text(
-        to_fancy_font(f"✅ Successfully sent {sent_count} files to your PM!\n"
+        f"✅ Successfully sent {sent_count} files to your PM!\n"
         f"📁 Files will be auto-deleted in 5 minutes.\n"
         f"🔍 Search: `{search}`\n"
-        f"{filters_applied}")
+        f"{filters_applied}"
     )
     
     # Delete notification after 10 seconds
     asyncio.create_task(schedule_delete(notification, 10))
-
-
-# Removed individual language/session handlers as they are now handled by filter_ callback
-
 
 @Client.on_callback_query(filters.regex(r"^spolling"))
 async def advantage_spoll_choker(bot, query):
@@ -533,7 +525,7 @@ async def advantage_spoll_choker(bot, query):
         return await query.message.delete()
     movies = SPELL_CHECK.get(query.message.reply_to_message.id)
     if not movies:
-        return await query.answer(to_fancy_font("You are clicking on an old button which is expired."), show_alert=True)
+        return await query.answer("You are clicking on an old button which is expired.", show_alert=True)
     movie = movies[(int(movie_))]
     await query.answer('Checking for Movie in database...')
     # Pass query message, not the callback query object
@@ -544,7 +536,7 @@ async def advantage_spoll_choker(bot, query):
             k = (movie, files, offset, total_results)
             await auto_filter(bot, query, k)
         else:
-            k = await query.message.edit(to_fancy_font('This Movie Not Found In DataBase'))
+            k = await query.message.edit('This Movie Not Found In DataBase')
             asyncio.create_task(schedule_delete(k, 10))
 
 @Client.on_callback_query()
@@ -560,7 +552,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         
         search_data = BUTTONS.get(key)
         if not search_data:
-            return await query.message.edit_text(to_fancy_font("Search expired. Please search again."))
+            return await query.message.edit_text("Search expired. Please search again.")
 
         # Create filter buttons
         filter_buttons = create_filter_buttons(filter_type, key, search_data)
@@ -579,7 +571,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         
         search_data = BUTTONS.get(key)
         if not search_data:
-            return await query.answer(to_fancy_font("Search expired. Please search again."), show_alert=True)
+            return await query.answer("Search expired. Please search again.", show_alert=True)
 
         # Toggle logic - If already selected, deselect it (set to None)
         current_selection = search_data.get(filter_type)
@@ -611,7 +603,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
              if not files_check:
                  # If no files found, don't set the filter and inform user
                  alert_msg = f"🚫 No file found for {filter_value} filter. Please choose another."
-                 await query.answer(to_fancy_font(alert_msg), show_alert=True)
+                 await query.answer(alert_msg, show_alert=True)
                  # Update button state (checkmarks) to show it's NOT selected
                  new_filter_buttons = create_filter_buttons(filter_type, key, search_data)
                  await query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(new_filter_buttons))
@@ -623,7 +615,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         
         # Update the state
         search_data[filter_type] = new_value
-        await query.answer(to_fancy_font(alert_msg), show_alert=False)
+        await query.answer(alert_msg, show_alert=False)
 
         # Update search_data in the global dictionary
         BUTTONS[key] = search_data
@@ -642,7 +634,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
         # Run search with new filter
         await run_filtered_search(client, query, key)
 
-
     elif query.data.startswith("back_to_files#"):
         # back_to_files#key
         _, key = query.data.split("#")
@@ -654,19 +645,20 @@ async def cb_handler(client: Client, query: CallbackQuery):
         # This will be handled by the send_all_files function above
         pass
     
-    # Removed explicit lang/season/quality handlers as they use the generic logic
-    
     # PM ISSUE FIX & File Sent Message Logic
     elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
         
-        # FIX FOR KeyError: 0
+        # FIX FOR KeyError: 0 - Added proper error handling
         if not files_:
-            # This check handles the error you were seeing in the logs if get_file_details returns empty
-            return await query.answer(to_fancy_font('No Such File Exist.'))
+            return await query.answer('No Such File Exist.', show_alert=True)
         
-        files = files_[0] # Safely access the first item now
+        try:
+            files = files_[0] # Safely access the first item now
+        except (IndexError, KeyError):
+            return await query.answer('File details not found.', show_alert=True)
+            
         title = files.file_name
         size = get_size(files.file_size)
         f_caption = files.caption
@@ -718,19 +710,17 @@ async def cb_handler(client: Client, query: CallbackQuery):
             asyncio.create_task(schedule_delete(sent_msg, 300))
             
             # Answer the callback query
-            await query.answer(to_fancy_font('Check PM, I have sent the file. It will be deleted in 5 minutes.'), show_alert=True)
+            await query.answer('Check PM, I have sent the file. It will be deleted in 5 minutes.', show_alert=True)
             
         except UserIsBlocked:
-            await query.answer(to_fancy_font('Unblock the bot first!'), show_alert=True)
+            await query.answer('Unblock the bot first!', show_alert=True)
         except PeerIdInvalid:
             # User hasn't started the bot yet. Redirect them to start it.
-            await query.answer(to_fancy_font("Please start the bot in private chat first!"), url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}", show_alert=True)
+            await query.answer("Please start the bot in private chat first!", url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}", show_alert=True)
         except Exception as e:
             # Catch all other errors and redirect to PM as a fallback
             logger.exception(f"Error sending file to PM: {e}")
-            await query.answer(to_fancy_font("An error occurred while sending the file. Please try again later or contact admin."), show_alert=True)
-            # Fallback to start link might still be useful in some unknown edge cases
-            # await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}") 
+            await query.answer("An error occurred while sending the file. Please try again later or contact admin.", show_alert=True)
 
     # ... (rest of the cb_handler remains the same)
     
@@ -771,13 +761,13 @@ async def cb_handler(client: Client, query: CallbackQuery):
         
     elif query.data == "start":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('➕ Add Me To Your Groups ➕'), url=f'http://t.me/{temp.U_NAME}?startgroup=true')
+            InlineKeyboardButton(to_fancy_font('Add Me To Your Groups'), url=f'http://t.me/{temp.U_NAME}?startgroup=true')
         ], [
-            InlineKeyboardButton(to_fancy_font('🔍 Search'), switch_inline_query_current_chat=''),
-            InlineKeyboardButton(to_fancy_font('🤖 Updates'), url='https://t.me/asbhai_bsr')
+            InlineKeyboardButton(to_fancy_font('Search'), switch_inline_query_current_chat=''),
+            InlineKeyboardButton(to_fancy_font('Updates'), url='https://t.me/asbhai_bsr')
         ], [
-            InlineKeyboardButton(to_fancy_font('ℹ️ Help'), callback_data='help'),
-            InlineKeyboardButton(to_fancy_font('😊 About'), callback_data='about')
+            InlineKeyboardButton(to_fancy_font('Help'), callback_data='help'),
+            InlineKeyboardButton(to_fancy_font('About'), callback_data='about')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -794,8 +784,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
             InlineKeyboardButton(to_fancy_font('Connection'), callback_data='coct'),
             InlineKeyboardButton(to_fancy_font('Extra Mods'), callback_data='extra')
         ], [
-            InlineKeyboardButton(to_fancy_font('🏠 Home'), callback_data='start'),
-            InlineKeyboardButton(to_fancy_font('🔮 Status'), callback_data='stats')
+            InlineKeyboardButton(to_fancy_font('Home'), callback_data='start'),
+            InlineKeyboardButton(to_fancy_font('Status'), callback_data='stats')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -805,11 +795,11 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     elif query.data == "about":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('🤖 Updates'), url='https://t.me/asbhai_bsr'),
-            InlineKeyboardButton(to_fancy_font('♥️ Source'), callback_data='source')
+            InlineKeyboardButton(to_fancy_font('Updates'), url='https://t.me/asbhai_bsr'),
+            InlineKeyboardButton(to_fancy_font('Source'), callback_data='source')
         ], [
-            InlineKeyboardButton(to_fancy_font('🏠 Home'), callback_data='start'),
-            InlineKeyboardButton(to_fancy_font('🔐 Close'), callback_data='close_data')
+            InlineKeyboardButton(to_fancy_font('Home'), callback_data='start'),
+            InlineKeyboardButton(to_fancy_font('Close'), callback_data='close_data')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -819,7 +809,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     elif query.data == "source":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('👩‍🦯 Back'), callback_data='about')
+            InlineKeyboardButton(to_fancy_font('Back'), callback_data='about')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -829,8 +819,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     elif query.data == "manuelfilter":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('👩‍🦯 Back'), callback_data='help'),
-            InlineKeyboardButton(to_fancy_font('⏹️ Buttons'), callback_data='button')
+            InlineKeyboardButton(to_fancy_font('Back'), callback_data='help'),
+            InlineKeyboardButton(to_fancy_font('Buttons'), callback_data='button')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -840,7 +830,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     elif query.data == "button":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('👩‍🦯 Back'), callback_data='manuelfilter')
+            InlineKeyboardButton(to_fancy_font('Back'), callback_data='manuelfilter')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -850,7 +840,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     elif query.data == "autofilter":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('👩‍🦯 Back'), callback_data='help')
+            InlineKeyboardButton(to_fancy_font('Back'), callback_data='help')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -860,7 +850,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     elif query.data == "coct":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('👩‍🦯 Back'), callback_data='help')
+            InlineKeyboardButton(to_fancy_font('Back'), callback_data='help')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -870,8 +860,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     elif query.data == "extra":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('👩‍🦯 Back'), callback_data='help'),
-            InlineKeyboardButton(to_fancy_font('👮‍♂️ Admin'), callback_data='admin')
+            InlineKeyboardButton(to_fancy_font('Back'), callback_data='help'),
+            InlineKeyboardButton(to_fancy_font('Admin'), callback_data='admin')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -881,7 +871,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     elif query.data == "admin":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('👩‍🦯 Back'), callback_data='extra')
+            InlineKeyboardButton(to_fancy_font('Back'), callback_data='extra')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -891,8 +881,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     elif query.data == "stats":
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('👩‍🦯 Back'), callback_data='help'),
-            InlineKeyboardButton(to_fancy_font('♻️ Refresh'), callback_data='rfrsh')
+            InlineKeyboardButton(to_fancy_font('Back'), callback_data='help'),
+            InlineKeyboardButton(to_fancy_font('Refresh'), callback_data='rfrsh')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         total = await Media.count_documents()
@@ -910,8 +900,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
     elif query.data == "rfrsh":
         await query.answer("Fetching MongoDB Database")
         buttons = [[
-            InlineKeyboardButton(to_fancy_font('👩‍🦯 Back'), callback_data='help'),
-            InlineKeyboardButton(to_fancy_font('♻️ Refresh'), callback_data='rfrsh')
+            InlineKeyboardButton(to_fancy_font('Back'), callback_data='help'),
+            InlineKeyboardButton(to_fancy_font('Refresh'), callback_data='rfrsh')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         total = await Media.count_documents()
@@ -931,7 +921,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         grpid = await active_connection(str(query.from_user.id))
 
         if str(grp_id) != str(grpid):
-            await query.message.edit(to_fancy_font("Your active connection has been changed. Go to /settings."))
+            await query.message.edit("Your active connection has been changed. Go to /settings.")
             return await query.answer('Piracy Is Crime')
 
         # status is a string, convert to boolean for logical inversion
@@ -954,29 +944,29 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 ],
                 [
                     InlineKeyboardButton(to_fancy_font('Bot PM'), callback_data=f'setgs#botpm#{settings["botpm"]}#{str(grp_id)}'),
-                    InlineKeyboardButton(to_fancy_font('✅ Yes') if settings["botpm"] else to_fancy_font('❌ No'),
+                    InlineKeyboardButton(to_fancy_font('Yes') if settings["botpm"] else to_fancy_font('No'),
                                          callback_data=f'setgs#botpm#{settings["botpm"]}#{str(grp_id)}')
                 ],
                 [
                     InlineKeyboardButton(to_fancy_font('File Secure'),
                                          callback_data=f'setgs#file_secure#{settings["file_secure"]}#{str(grp_id)}'),
-                    InlineKeyboardButton(to_fancy_font('✅ Yes') if settings["file_secure"] else to_fancy_font('❌ No'),
+                    InlineKeyboardButton(to_fancy_font('Yes') if settings["file_secure"] else to_fancy_font('No'),
                                          callback_data=f'setgs#file_secure#{settings["file_secure"]}#{str(grp_id)}')
                 ],
                 [
                     InlineKeyboardButton(to_fancy_font('IMDB'), callback_data=f'setgs#imdb#{settings["imdb"]}#{str(grp_id)}'),
-                    InlineKeyboardButton(to_fancy_font('✅ Yes') if settings["imdb"] else to_fancy_font('❌ No'),
+                    InlineKeyboardButton(to_fancy_font('Yes') if settings["imdb"] else to_fancy_font('No'),
                                          callback_data=f'setgs#imdb#{settings["imdb"]}#{str(grp_id)}')
                 ],
                 [
                     InlineKeyboardButton(to_fancy_font('Spell Check'),
                                          callback_data=f'setgs#spell_check#{settings["spell_check"]}#{str(grp_id)}'),
-                    InlineKeyboardButton(to_fancy_font('✅ Yes') if settings["spell_check"] else to_fancy_font('❌ No'),
+                    InlineKeyboardButton(to_fancy_font('Yes') if settings["spell_check"] else to_fancy_font('No'),
                                          callback_data=f'setgs#spell_check#{settings["spell_check"]}#{str(grp_id)}')
                 ],
                 [
                     InlineKeyboardButton(to_fancy_font('Welcome'), callback_data=f'setgs#welcome#{settings["welcome"]}#{str(grp_id)}'),
-                    InlineKeyboardButton(to_fancy_font('✅ Yes') if settings["welcome"] else to_fancy_font('❌ No'),
+                    InlineKeyboardButton(to_fancy_font('Yes') if settings["welcome"] else to_fancy_font('No'),
                                          callback_data=f'setgs#welcome#{settings["welcome"]}#{str(grp_id)}')
                 ]
             ]
@@ -1007,8 +997,7 @@ async def auto_filter(client, msg, spoll=False):
                         "_____________________\n\n"
                         "**Search second bot - @asfilter_bot**"
                     )
-                    # APPLY FANCY FONT TO NOT FOUND MESSAGE
-                    not_found_message = await msg.reply_text(to_fancy_font(not_found_text), quote=True, parse_mode=enums.ParseMode.MARKDOWN)
+                    not_found_message = await msg.reply_text(not_found_text, quote=True, parse_mode=enums.ParseMode.MARKDOWN)
                     asyncio.create_task(schedule_delete(not_found_message, 10))
                     return
         else:
@@ -1033,27 +1022,24 @@ async def auto_filter(client, msg, spoll=False):
     pre = 'filep' if settings['file_secure'] else 'file'
     btn = []
 
-    # Filter buttons row (New Order: Quality, Language, Season - above Send All)
+    # Filter buttons row - Quality and Language in one line, Session below
     btn.append([
-        InlineKeyboardButton(text=to_fancy_font("🎬 Quality"), callback_data=f"open_filter#quality#{key}"),
-        InlineKeyboardButton(text=to_fancy_font("🌐 Language"), callback_data=f"open_filter#language#{key}"),
-        InlineKeyboardButton(text=to_fancy_font("📺 Season"), callback_data=f"open_filter#season#{key}")
+        InlineKeyboardButton(text=to_fancy_font("Quality"), callback_data=f"open_filter#quality#{key}"),
+        InlineKeyboardButton(text=to_fancy_font("Language"), callback_data=f"open_filter#language#{key}")
     ])
     
-    # Send All Files button
+    # Session and Send All Files buttons in second row
     btn.append([
-        InlineKeyboardButton(
-            text=to_fancy_font("🚀 Send All Files"), 
-            callback_data=f"sendall_{key}"
-        )
+        InlineKeyboardButton(text=to_fancy_font("Session"), callback_data=f"open_filter#season#{key}"),
+        InlineKeyboardButton(text=to_fancy_font("Send All Files"), callback_data=f"sendall_{key}")
     ])
     
-    # File buttons
+    # File buttons - FIXED: Regular font for file names
     if settings["button"]:
         file_btn = [
             [
                 InlineKeyboardButton(
-                    text=f"📁 {to_fancy_font(file.file_name)}",
+                    text=f"{file.file_name}",  # Regular font
                     callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
@@ -1063,11 +1049,11 @@ async def auto_filter(client, msg, spoll=False):
         file_btn = [
             [
                 InlineKeyboardButton(
-                    text=f"📂 {to_fancy_font(file.file_name)}",
+                    text=f"{file.file_name}",  # Regular font
                     callback_data=f'{pre}#{file.file_id}',
                 ),
                 InlineKeyboardButton(
-                    text=f"💾 {to_fancy_font(get_size(file.file_size))}",
+                    text=f"{get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}',
                 ),
             ]
@@ -1091,41 +1077,41 @@ async def auto_filter(client, msg, spoll=False):
     
     if int_offset > 0:
         pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("⏪ Back"), callback_data=f"next_{req}_{key}_{int_offset-10}")
+            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{int_offset-10}")
         )
     
     pagination_buttons.append(
-        InlineKeyboardButton(to_fancy_font(f"📄 {current_page}/{total_pages}"), callback_data="pages")
+        InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages")
     )
     
     if int_offset + 10 < total_results:
         pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("Next ⏩"), callback_data=f"next_{req}_{key}_{int_offset+10}")
+            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{int_offset+10}")
         )
     
     if pagination_buttons:
         btn.append(pagination_buttons)
 
-    # Check Bot PM button (FIX: Direct user mention, no link)
+    # Check Bot PM button
     btn.append([
         InlineKeyboardButton(
-            text=to_fancy_font("🔍 Check Bot PM"), 
+            text=to_fancy_font("Check Bot PM"), 
             url=f"https://t.me/{temp.U_NAME}"
         )
     ])
 
-    # Custom Message - FIX: Removed ([), (]), and (<>) from search result message
+    # Custom Message - FIXED: Clean message without fancy font
     user_mention = message.from_user.mention if message.from_user else 'User'
     chat_title = message.chat.title if message.chat.title else 'This Group'
     
-    # FIX: Requested by message structure changed to avoid fancy font link error
+    # FIXED: Clean message format with proper "Requested By" format
     custom_msg = f"""
-**📂 Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
+**Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
 
-**📢 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ:** {user_mention}
-**♾️ Powered By: {chat_title}**
+**Requested By:** {user_mention}
+**Powered By: {chat_title}**
 
-**🍿 Your Movie Files ({total_results}) 👇**
+**Your Movie Files ({total_results})**
 """
 
     imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
@@ -1133,7 +1119,6 @@ async def auto_filter(client, msg, spoll=False):
     
     # IMDB and Caption Logic (Kept as is for consistency)
     if imdb:
-        # ... (IMDB caption generation logic)
         cap = TEMPLATE.format(
             query=search,
             title=imdb['title'],
@@ -1172,21 +1157,17 @@ async def auto_filter(client, msg, spoll=False):
     sent_message = None
     if imdb and imdb.get('poster'):
         try:
-            # Apply fancy font to the final caption
-            sent_message = await message.reply_photo(photo=imdb.get('poster'), caption=to_fancy_font(cap[:1024]),
+            sent_message = await message.reply_photo(photo=imdb.get('poster'), caption=cap[:1024],
                                       reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.MARKDOWN)
         except (MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty):
             pic = imdb.get('poster')
             poster = pic.replace('.jpg', "._V1_UX360.jpg")
-            # Apply fancy font to the final caption
-            sent_message = await message.reply_photo(photo=poster, caption=to_fancy_font(cap[:1024]), reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.MARKDOWN)
+            sent_message = await message.reply_photo(photo=poster, caption=cap[:1024], reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.MARKDOWN)
         except Exception as e:
             logger.exception(e)
-            # Apply fancy font to the final caption
-            sent_message = await message.reply_text(to_fancy_font(cap), reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.MARKDOWN)
+            sent_message = await message.reply_text(cap, reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.MARKDOWN)
     else:
-        # Apply fancy font to the final caption
-        sent_message = await message.reply_text(to_fancy_font(cap), reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.MARKDOWN)
+        sent_message = await message.reply_text(cap, reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.MARKDOWN)
 
     # Schedule deletion of result message after 10 minutes
     if sent_message:
@@ -1214,7 +1195,7 @@ async def advantage_spell_chok(msg):
             "_____________________\n\n"
             "**Search second bot - @asfilter_bot**"
         )
-        k = await msg.reply_text(to_fancy_font(not_found_text), parse_mode=enums.ParseMode.MARKDOWN)
+        k = await msg.reply_text(not_found_text, parse_mode=enums.ParseMode.MARKDOWN)
         asyncio.create_task(schedule_delete(k, 8))
         return
     regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)
@@ -1228,12 +1209,9 @@ async def advantage_spell_chok(msg):
         for mv in g_s:
             match = reg.match(mv)
             if match:
-                # Use group(1) if it exists, otherwise just the whole match or a part of it
-                # Assuming group(1) captures the movie title part
                 if match.groups():
                     gs_parsed.append(match.group(1))
                 else:
-                    # Fallback if the regex structure changed or is unexpected
                     gs_parsed.append(mv.split('|')[0].strip().replace('watch', '').strip())
     user = msg.from_user.id if msg.from_user else 0
     movielist = []
@@ -1254,7 +1232,7 @@ async def advantage_spell_chok(msg):
             "_____________________\n\n"
             "**Search second bot - @asfilter_bot**"
         )
-        k = await msg.reply_text(to_fancy_font(not_found_text), parse_mode=enums.ParseMode.MARKDOWN)
+        k = await msg.reply_text(not_found_text, parse_mode=enums.ParseMode.MARKDOWN)
         asyncio.create_task(schedule_delete(k, 8))
         return
     SPELL_CHECK[msg.id] = movielist
@@ -1264,8 +1242,8 @@ async def advantage_spell_chok(msg):
             callback_data=f"spolling#{user}#{k}",
         )
     ] for k, movie in enumerate(movielist)]
-    btn.append([InlineKeyboardButton(text=to_fancy_font("🔐 Close"), callback_data=f'spolling#{user}#close_spellcheck')])
-    spell_check_message = await msg.reply(to_fancy_font("I couldn't find anything relatd to that\nDid you mean any one of these?"),
+    btn.append([InlineKeyboardButton(text=to_fancy_font("Close"), callback_data=f'spolling#{user}#close_spellcheck')])
+    spell_check_message = await msg.reply("I couldn't find anything relatd to that\nDid you mean any one of these?",
                     reply_markup=InlineKeyboardMarkup(btn))
     asyncio.create_task(schedule_delete(spell_check_message, 60))
 
@@ -1281,23 +1259,14 @@ async def manual_filters(client, message, text=False):
 
             if reply_text:
                 reply_text = reply_text.replace("\\n", "\n").replace("\\t", "\t")
-                # Apply fancy font to reply text
-                reply_text = to_fancy_font(reply_text) 
 
             if btn is not None:
                 try:
                     if fileid == "None":
                         if btn == "[]":
-                            # Use message.reply_text for better flow
                             await message.reply_text(reply_text, disable_web_page_preview=True)
                         else:
                             button_structure = eval(btn)
-                            # Apply fancy font to buttons
-                            for row in button_structure:
-                                for button in row:
-                                    if 'text' in button:
-                                        button['text'] = to_fancy_font(button['text'])
-                            
                             button = InlineKeyboardMarkup(button_structure)
                             await message.reply_text(
                                 reply_text,
@@ -1310,13 +1279,7 @@ async def manual_filters(client, message, text=False):
                             caption=reply_text or "",
                         )
                     else:
-                        button_structure = eval(btn)
-                        # Apply fancy font to buttons
-                        for row in button_structure:
-                            for button in row:
-                                if 'text' in button:
-                                    button['text'] = to_fancy_font(button['text'])
-                                    
+                        button_structure = eval(btn)                    
                         button = InlineKeyboardMarkup(button_structure)
                         await message.reply_cached_media(
                             fileid,
