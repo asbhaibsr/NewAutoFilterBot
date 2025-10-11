@@ -42,7 +42,8 @@ async def schedule_delete(message, delay_seconds):
     """Delete message after specified delay"""
     await asyncio.sleep(delay_seconds)
     try:
-        if message and message.id:
+        # Check if the message object and its id are valid
+        if message and hasattr(message, 'id') and message.id:
             await message.delete()
     except Exception as e:
         logger.warning(f"Error deleting message: {e}")
@@ -58,10 +59,12 @@ async def next_page(bot, query):
     ident, req, key, offset = query.data.split("_")
     if int(req) not in [query.from_user.id, 0]:
         return await query.answer("oKda", show_alert=True)
+        
+    # FIX 1: Ensure offset is an integer before use
     try:
         offset = int(offset)
-    except:
-        offset = 0
+    except ValueError:
+        offset = 0  # Default to 0 if offset is not a valid integer (e.g., empty string)
     
     search = BUTTONS.get(key)
     if not search:
@@ -70,11 +73,14 @@ async def next_page(bot, query):
 
     files, n_offset, total = await get_search_results(search, offset=offset, filter=True)
     try:
-        n_offset = int(n_offset)
-    except:
+        # FIX 1.1: Ensure n_offset is an integer before comparison/use
+        n_offset = int(n_offset) if n_offset else 0
+    except ValueError:
         n_offset = 0
 
     if not files:
+        # If no files found for the next page, just answer and return
+        await query.answer("No more results.", show_alert=True)
         return
 
     settings = await get_settings(query.message.chat.id)
@@ -171,7 +177,7 @@ async def next_page(bot, query):
     ])
 
     # Pagination
-    current_page = math.ceil(int(offset) / 10) + 1
+    current_page = math.ceil(offset / 10) + 1
     total_pages = math.ceil(total / 10)
     
     pagination_buttons = []
@@ -214,10 +220,17 @@ async def send_all_files(bot, query):
     all_files = []
     offset = 0
     while True:
+        # NOTE: max_results should ideally be a constant, using 100 for now.
         files, next_offset, total = await get_search_results(search, offset=offset, max_results=100, filter=True)
         all_files.extend(files)
         
-        if not next_offset:
+        # Ensure next_offset is converted to int or defaults to 0
+        try:
+            next_offset = int(next_offset)
+        except (TypeError, ValueError):
+            next_offset = 0
+
+        if next_offset == 0:
             break
         offset = next_offset
     
@@ -310,7 +323,8 @@ async def advantage_spoll_choker(bot, query):
         return await query.answer("You are clicking on an old button which is expired.", show_alert=True)
     movie = movies[(int(movie_))]
     await query.answer('Checking for Movie in database...')
-    k = await manual_filters(bot, query.message, text=movie)
+    # Pass query message, not the callback query object
+    k = await manual_filters(bot, query.message.reply_to_message, text=movie)
     if k == False:
         files, offset, total_results = await get_search_results(movie, offset=0, filter=True)
         if files:
@@ -378,7 +392,12 @@ async def cb_handler(client: Client, query: CallbackQuery):
         chat_type = query.message.chat.type
 
         if chat_type == enums.ChatType.PRIVATE:
-            await query.message.reply_to_message.delete()
+            # Safely attempt to delete the reply_to_message and the current message
+            try:
+                if query.message.reply_to_message:
+                    await query.message.reply_to_message.delete()
+            except:
+                pass
             await query.message.delete()
 
         elif chat_type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
@@ -795,7 +814,10 @@ async def cb_handler(client: Client, query: CallbackQuery):
             await query.message.edit("Yᴏᴜʀ ᴀᴄᴛɪᴠᴇ ᴄᴏɴɴᴇᴄᴛɪᴏɴ ʜᴀs ʙᴇᴇɴ ᴄʜᴀɴɢᴇᴅ. ɢᴏ ᴛᴏ /sᴇᴛᴛɪɴɢs.")
             return await query.answer('Piracy Is Crime')
 
-        if status == "True":
+        # status is a string, convert to boolean for logical inversion
+        current_status = True if status == "True" else False
+
+        if current_status:
             await save_group_settings(grpid, set_type, False)
         else:
             await save_group_settings(grpid, set_type, True)
@@ -873,8 +895,9 @@ async def auto_filter(client, msg, spoll=False):
         else:
             return
     else:
-        settings = await get_settings(msg.message.chat.id)
+        # If from spell check, use the message the search was initiated from
         message = msg.message.reply_to_message
+        settings = await get_settings(message.chat.id)
         search, files, offset, total_results = spoll
         
     pre = 'filep' if settings['file_secure'] else 'file'
@@ -971,27 +994,32 @@ async def auto_filter(client, msg, spoll=False):
         )
     ])
 
-    # Pagination - FIXED: Convert offset to integer before comparison
+    # Pagination - FIX 2: Ensure offset is an integer before arithmetic and comparison
     req = message.from_user.id if message.from_user else 0
-    current_page = 1
+    
+    # Convert offset to integer safely
+    try:
+        int_offset = int(offset)
+    except ValueError:
+        int_offset = 0
+
+    current_page = math.ceil(int_offset / 10) + 1
     total_pages = math.ceil(total_results / 10)
     
     pagination_buttons = []
     
-    # FIX: Convert offset to integer before comparison
-    if int(offset) > 0:
+    if int_offset > 0:
         pagination_buttons.append(
-            InlineKeyboardButton("⏪ Bᴀᴄᴋ", callback_data=f"next_{req}_{key}_{int(offset)-10}")
+            InlineKeyboardButton("⏪ Bᴀᴄᴋ", callback_data=f"next_{req}_{key}_{int_offset-10}")
         )
     
     pagination_buttons.append(
         InlineKeyboardButton(f"📄 {current_page}/{total_pages}", callback_data="pages")
     )
     
-    # FIX: Convert offset to integer before comparison
-    if int(offset) + 10 < total_results:
+    if int_offset + 10 < total_results:
         pagination_buttons.append(
-            InlineKeyboardButton("Nᴇxᴛ ⏩", callback_data=f"next_{req}_{key}_{int(offset)+10}")
+            InlineKeyboardButton("Nᴇxᴛ ⏩", callback_data=f"next_{req}_{key}_{int_offset+10}")
         )
     
     if pagination_buttons:
@@ -1068,6 +1096,7 @@ async def auto_filter(client, msg, spoll=False):
         asyncio.create_task(schedule_delete(sent_message, 600))
         
     if spoll:
+        # Delete the spell check message
         await msg.message.delete()
 
 async def advantage_spell_chok(msg):
@@ -1102,7 +1131,13 @@ async def advantage_spell_chok(msg):
         for mv in g_s:
             match = reg.match(mv)
             if match:
-                gs_parsed.append(match.group(1))
+                # Use group(1) if it exists, otherwise just the whole match or a part of it
+                # Assuming group(1) captures the movie title part
+                if match.groups():
+                    gs_parsed.append(match.group(1))
+                else:
+                    # Fallback if the regex structure changed or is unexpected
+                    gs_parsed.append(mv.split('|')[0].strip().replace('watch', '').strip())
     user = msg.from_user.id if msg.from_user else 0
     movielist = []
     gs_parsed = list(dict.fromkeys(gs_parsed))
@@ -1154,31 +1189,30 @@ async def manual_filters(client, message, text=False):
                 try:
                     if fileid == "None":
                         if btn == "[]":
-                            await client.send_message(group_id, reply_text, disable_web_page_preview=True)
+                            # Use message.reply_text for better flow
+                            await message.reply_text(reply_text, disable_web_page_preview=True)
                         else:
                             button_structure = eval(btn)
+                            # Apply fancy font to buttons
                             for row in button_structure:
                                 for button in row:
                                     if 'text' in button:
                                         button['text'] = to_fancy_font(button['text'])
                             
                             button = InlineKeyboardMarkup(button_structure)
-                            await client.send_message(
-                                group_id,
+                            await message.reply_text(
                                 reply_text,
                                 disable_web_page_preview=True,
-                                reply_markup=button,
-                                reply_to_message_id=reply_id
+                                reply_markup=button
                             )
                     elif btn == "[]":
-                        await client.send_cached_media(
-                            group_id,
+                        await message.reply_cached_media(
                             fileid,
                             caption=reply_text or "",
-                            reply_to_message_id=reply_id
                         )
                     else:
                         button_structure = eval(btn)
+                        # Apply fancy font to buttons
                         for row in button_structure:
                             for button in row:
                                 if 'text' in button:
@@ -1188,8 +1222,7 @@ async def manual_filters(client, message, text=False):
                         await message.reply_cached_media(
                             fileid,
                             caption=reply_text or "",
-                            reply_markup=button,
-                            reply_to_message_id=reply_id
+                            reply_markup=button
                         )
                 except Exception as e:
                     logger.exception(e)
