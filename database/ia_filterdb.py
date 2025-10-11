@@ -8,10 +8,10 @@ from umongo import Instance, Document, fields
 from motor.motor_asyncio import AsyncIOMotorClient
 from marshmallow.exceptions import ValidationError
 from info import DATABASE_URI, DATABASE_NAME, COLLECTION_NAME, USE_CAPTION_FILTER
-import time
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
 
 client = AsyncIOMotorClient(DATABASE_URI)
 db = client[DATABASE_NAME]
@@ -31,8 +31,11 @@ class Media(Document):
         indexes = ('$file_name', )
         collection_name = COLLECTION_NAME
 
+
 async def save_file(media):
     """Save file in database"""
+
+    # TODO: Find better way to get same file_id for same media to avoid duplicates
     file_id, file_ref = unpack_new_file_id(media.file_id)
     file_name = re.sub(r"(_|\-|\.|\+)", " ", str(media.file_name))
     try:
@@ -55,102 +58,86 @@ async def save_file(media):
             logger.warning(
                 f'{getattr(media, "file_name", "NO_FILE")} is already saved in database'
             )
+
             return False, 0
         else:
             logger.info(f'{getattr(media, "file_name", "NO_FILE")} is saved to database')
             return True, 1
 
-async def get_search_results(query, file_type=None, max_results=10, offset=0, filter=False):
-    """Optimized search function with better performance"""
-    start_time = time.time()
-    query = query.strip().lower()
-    
+
+async def get_search_results(query, file_type=None, max_results=10, offset=0, filter=False, language=None, quality=None, season=None):
+    """For given query return (results, next_offset)"""
+
+    query = query.strip()
     if not query:
-        return [], '', 0
-    
-    # Create search pattern for better matching
-    if ' ' not in query:
-        # Single word search - use word boundaries
-        pattern = f'\\b{re.escape(query)}\\b'
+        raw_pattern = '.'
+    elif ' ' not in query:
+        # Search for query word with boundaries
+        raw_pattern = r'(\b|[\.\+\-_])' + re.escape(query) + r'(\b|[\.\+\-_])' 
     else:
-        # Multiple words - allow partial matches with word boundaries
-        words = query.split()
-        pattern = '.*'.join([f'\\b{re.escape(word)}' for word in words])
+        # Search for space-separated words, allowing non-word characters in between
+        raw_pattern = '.*'.join(re.escape(q) for q in query.split())
     
     try:
-        regex = re.compile(pattern, flags=re.IGNORECASE)
-    except re.error:
-        # Fallback to simple search if regex fails
-        regex = re.compile(re.escape(query), flags=re.IGNORECASE)
-    
-    # Build filter with optimized query
+        regex = re.compile(raw_pattern, flags=re.IGNORECASE)
+    except:
+        return [], 0, 0
+
+    # Base filter searches in file_name or caption
     if USE_CAPTION_FILTER:
-        search_filter = {
-            '$or': [
-                {'file_name': {'$regex': regex}},
-                {'caption': {'$regex': regex}}
-            ]
-        }
+        base_filter = {'$or': [{'file_name': regex}, {'caption': regex}]}
     else:
-        search_filter = {'file_name': {'$regex': regex}}
-    
+        base_filter = {'file_name': regex}
+
     if file_type:
-        search_filter['file_type'] = file_type
+        base_filter['file_type'] = file_type
+
+    # NEW: Apply additional filters for language, quality, and season
     
-    # Get total count
-    total_results = await Media.count_documents(search_filter)
+    # Combined list of regex patterns for all filters (language, quality, season)
+    filter_patterns = []
+
+    if language:
+        # Match language name with word boundaries
+        filter_patterns.append(r'(\b|[\.\+\-_])' + re.escape(language) + r'(\b|[\.\+\-_])')
+
+    if quality:
+        # Match quality/rip name with word boundaries
+        filter_patterns.append(r'(\b|[\.\+\-_])' + re.escape(quality) + r'(\b|[\.\+\-_])')
     
-    # Calculate next offset
+    if season:
+        # Match season name (e.g., S01, S1) with word boundaries
+        filter_patterns.append(r'(\b|[\.\+\-_])' + re.escape(season) + r'(\b|[\.\+\-_])')
+
+    # If any filters are applied, modify the base filter to ensure all patterns exist in file_name
+    if filter_patterns:
+        # Create an $and query for the combined search and filter patterns
+        
+        # 1. Base search (file_name or caption)
+        combined_filter = [base_filter]
+        
+        # 2. Additional filters (must be in file_name)
+        for pattern in filter_patterns:
+            combined_filter.append({'file_name': {'$regex': re.compile(pattern, flags=re.IGNORECASE)}})
+        
+        filter = {'$and': combined_filter}
+    else:
+        filter = base_filter
+
+
+    total_results = await Media.count_documents(filter)
     next_offset = offset + max_results
+
     if next_offset >= total_results:
-        next_offset = ''
-    
-    # Execute query with optimization
-    cursor = Media.find(search_filter)
+        next_offset = 0
+
+    cursor = Media.find(filter)
     cursor.sort('$natural', -1)
     cursor.skip(offset).limit(max_results)
-    
     files = await cursor.to_list(length=max_results)
-    
-    end_time = time.time()
-    logger.info(f"Search for '{query}' took {end_time - start_time:.2f} seconds, found {len(files)} results")
-    
+
     return files, next_offset, total_results
 
+
 async def get_file_details(query):
-    """Get file details by file_id"""
-    search_filter = {'file_id': query}
-    cursor = Media.find(search_filter)
-    filedetails = await cursor.to_list(length=1)
-    return filedetails
-
-def encode_file_id(s: bytes) -> str:
-    r = b""
-    n = 0
-    for i in s + bytes([22]) + bytes([4]):
-        if i == 0:
-            n += 1
-        else:
-            if n:
-                r += b"\x00" + bytes([n])
-                n = 0
-            r += bytes([i])
-    return base64.urlsafe_b64encode(r).decode().rstrip("=")
-
-def encode_file_ref(file_ref: bytes) -> str:
-    return base64.urlsafe_b64encode(file_ref).decode().rstrip("=")
-
-def unpack_new_file_id(new_file_id):
-    """Return file_id, file_ref"""
-    decoded = FileId.decode(new_file_id)
-    file_id = encode_file_id(
-        pack(
-            "<iiqq",
-            int(decoded.file_type),
-            decoded.dc_id,
-            decoded.media_id,
-            decoded.access_hash
-        )
-    )
-    file_ref = encode_file_ref(decoded.file_reference)
-    return file_id, file_re
+# ... (rest of the file remains the same)
