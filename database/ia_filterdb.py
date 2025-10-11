@@ -31,22 +31,6 @@ class Media(Document):
         indexes = ('$file_name', )
         collection_name = COLLECTION_NAME
 
-# Helper function (Assuming this was present in the original bot logic)
-def unpack_new_file_id(new_file_id):
-    """Unpacks a file id to get the file_id and file_ref."""
-    if not isinstance(new_file_id, FileId):
-        new_file_id = FileId.decode(new_file_id)
-    
-    file_id = "{}_{}".format(new_file_id.media_type.value, base64.urlsafe_b64encode(pack('<i', new_file_id.file_unique_id)).decode().rstrip("=").strip())
-    
-    # file_ref will be the full file_id used for getting the file back from Telegram
-    file_ref = new_file_id.file_id
-    
-    return file_id, file_ref
-
-# --------------------------------------------------------------------------------------
-# DATABASE FUNCTIONS
-# --------------------------------------------------------------------------------------
 
 async def save_file(media):
     """Save file in database"""
@@ -81,99 +65,92 @@ async def save_file(media):
             return True, 1
 
 
-async def get_search_results(query, file_type=None, max_results=10, offset=0, filter=False, language=None, quality=None, season=None):
+
+async def get_search_results(query, file_type=None, max_results=10, offset=0, filter=False):
     """For given query return (results, next_offset)"""
 
     query = query.strip()
+    #if filter:
+        #better ?
+        #query = query.replace(' ', r'(\s|\.|\+|\-|_)')
+        #raw_pattern = r'(\s|_|\-|\.|\+)' + query + r'(\s|_|\-|\.|\+)'
     if not query:
-        # If query is empty, match any file
-        raw_pattern = r'.' 
+        raw_pattern = '.'
     elif ' ' not in query:
-        # Search for query word with boundaries
-        # Note: Added '|' and improved regex for better word boundary matching
-        raw_pattern = r'(\b|[\.\+\-_]|^)' + re.escape(query) + r'(\b|[\.\+\-_]|$)' 
+        raw_pattern = r'(\b|[\.\+\-_])' + query + r'(\b|[\.\+\-_])'
     else:
-        # Search for space-separated words, allowing non-word characters in between
-        # This will search for the entire phrase as an approximate match
-        raw_pattern = '.*'.join(re.escape(q) for q in query.split())
+        raw_pattern = query.replace(' ', r'.*[\s\.\+\-_]')
     
     try:
-        # Escape the regex special characters in raw_pattern before compiling
         regex = re.compile(raw_pattern, flags=re.IGNORECASE)
-    except Exception as e:
-        logger.error(f"Regex compilation error: {e}")
-        return [], 0, 0
+    except:
+        return []
 
-    # Base filter searches in file_name or caption
     if USE_CAPTION_FILTER:
-        # For base search, we use the original logic for file_name OR caption
-        base_filter_search = {'$or': [{'file_name': regex}, {'caption': regex}]}
+        filter = {'$or': [{'file_name': regex}, {'caption': regex}]}
     else:
-        base_filter_search = {'file_name': regex}
+        filter = {'file_name': regex}
 
     if file_type:
-        base_filter_search['file_type'] = file_type
+        filter['file_type'] = file_type
 
-    # Combined list of regex patterns for all filters (language, quality, season)
-    filter_patterns = []
-
-    if language:
-        # Match language name with word boundaries
-        # Use a more flexible regex for filter checks
-        filter_patterns.append(r'(\b|[\.\+\-_\/]|^)' + re.escape(language) + r'(\b|[\.\+\-_\/]|$)')
-
-    if quality:
-        # Match quality/rip name with word boundaries
-        filter_patterns.append(r'(\b|[\.\+\-_\/]|^)' + re.escape(quality) + r'(\b|[\.\+\-_\/]|$)')
-    
-    if season:
-        # Match season name (e.g., S01, S1) with word boundaries
-        filter_patterns.append(r'(\b|[\.\+\-_\/]|^)' + re.escape(season) + r'(\b|[\.\+\-_\/]|$)')
-
-    # If any filters are applied, modify the filter
-    if filter_patterns:
-        # Start with the base search filter
-        combined_filter_list = [base_filter_search]
-        
-        # Additional filters MUST be in the file_name (to avoid slow caption searches)
-        for pattern in filter_patterns:
-            try:
-                # Add each filter as a separate regex condition on file_name
-                combined_filter_list.append({'file_name': {'$regex': re.compile(pattern, flags=re.IGNORECASE)}})
-            except Exception as e:
-                logger.error(f"Filter Regex compilation error: {e}")
-                # If a filter regex fails, skip it or return empty results based on required strictness
-                continue
-        
-        # Combine all conditions with $and
-        final_filter = {'$and': combined_filter_list}
-    else:
-        # No filters, use the base search filter
-        final_filter = base_filter_search
-
-
-    total_results = await Media.count_documents(final_filter)
+    total_results = await Media.count_documents(filter)
     next_offset = offset + max_results
 
-    if next_offset >= total_results:
-        next_offset = 0
+    if next_offset > total_results:
+        next_offset = ''
 
-    cursor = Media.find(final_filter)
+    cursor = Media.find(filter)
+    # Sort by recent
     cursor.sort('$natural', -1)
+    # Slice files according to offset and max results
     cursor.skip(offset).limit(max_results)
+    # Get list of files
     files = await cursor.to_list(length=max_results)
 
     return files, next_offset, total_results
 
 
+
 async def get_file_details(query):
-    """
-    Get file details from database using file_id (_id field).
-    This function was missing its indented body, causing the IndentationError.
-    """
-    return await Media.find_one({'_id': query})
+    filter = {'file_id': query}
+    cursor = Media.find(filter)
+    filedetails = await cursor.to_list(length=1)
+    return filedetails
 
 
-async def delete_file(query):
-    """Delete file from database using file_id (_id field)."""
-    return await Media.delete_one({'_id': query})
+def encode_file_id(s: bytes) -> str:
+    r = b""
+    n = 0
+
+    for i in s + bytes([22]) + bytes([4]):
+        if i == 0:
+            n += 1
+        else:
+            if n:
+                r += b"\x00" + bytes([n])
+                n = 0
+
+            r += bytes([i])
+
+    return base64.urlsafe_b64encode(r).decode().rstrip("=")
+
+
+def encode_file_ref(file_ref: bytes) -> str:
+    return base64.urlsafe_b64encode(file_ref).decode().rstrip("=")
+
+
+def unpack_new_file_id(new_file_id):
+    """Return file_id, file_ref"""
+    decoded = FileId.decode(new_file_id)
+    file_id = encode_file_id(
+        pack(
+            "<iiqq",
+            int(decoded.file_type),
+            decoded.dc_id,
+            decoded.media_id,
+            decoded.access_hash
+        )
+    )
+    file_ref = encode_file_ref(decoded.file_reference)
+    return file_id, file_ref
