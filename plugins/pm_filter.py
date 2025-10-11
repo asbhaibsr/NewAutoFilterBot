@@ -23,14 +23,14 @@ BUTTONS = {}
 SPELL_CHECK = {}
 
 QUALITY_OPTIONS = [
-    ("360P", "360P"), ("480P", "480P"), ("720P", "720P"), 
+    ("360P", "36P"), ("480P", "480P"), ("720P", "720P"),
     ("1080P", "1080P"), ("1440P", "1440P"), ("2160P", "2160P"),
     ("4K", "4K"), ("2K", "2K"), ("BluRay", "BluRay"),
     ("HD Rip", "HD Rip"), ("Web-DL", "Web-DL"), ("HDRip", "HDRip")
 ]
 
 INDIAN_LANGUAGES = [
-    ("Hindi", "Hindi"), ("Tamil", "Tamil"), 
+    ("Hindi", "Hindi"), ("Tamil", "Tamil"),
     ("Telugu", "Telugu"), ("Malayalam", "Malayalam"),
     ("Kannada", "Kannada"), ("Bengali", "Bengali"),
     ("Marathi", "Marathi"), ("Gujarati", "Gujarati"),
@@ -42,15 +42,15 @@ SEASON_OPTIONS = [f"Season {i}" for i in range(1, 51)]
 def to_fancy_font(text):
     """Converts text to fancy font style"""
     mapping = {
-        'A': 'ᴀ', 'B': 'ʙ', 'C': 'ᴄ', 'D': 'ᴅ', 'E': 'ᴇ', 'F': 'ꜰ', 'G': 'ɢ', 'H': 'ʜ', 'I': 'ɪ', 'J': 'ᴊ', 
-        'K': 'ᴋ', 'L': 'ʟ', 'M': 'ᴍ', 'N': 'ɴ', 'O': 'ᴏ', 'P': 'ᴘ', 'Q': 'ǫ', 'R': 'ʀ', 'S': 's', 'T': 'ᴛ', 
+        'A': 'ᴀ', 'B': 'ʙ', 'C': 'ᴄ', 'D': 'ᴅ', 'E': 'ᴇ', 'F': 'ꜰ', 'G': 'ɢ', 'H': 'ʜ', 'I': 'ɪ', 'J': 'ᴊ',
+        'K': 'ᴋ', 'L': 'ʟ', 'M': 'ᴍ', 'N': 'ɴ', 'O': 'ᴏ', 'P': 'ᴘ', 'Q': 'ǫ', 'R': 'ʀ', 'S': 's', 'T': 'ᴛ',
         'U': 'ᴜ', 'V': 'ᴠ', 'W': 'ᴡ', 'X': 'x', 'Y': 'ʏ', 'Z': 'ᴢ',
         'a': 'ᴀ', 'b': 'ʙ', 'c': 'ᴄ', 'd': 'ᴅ', 'e': 'ᴇ', 'f': 'ꜰ', 'g': 'ɢ', 'h': 'ʜ', 'i': 'ɪ', 'j': 'ᴊ',
         'k': 'ᴋ', 'l': 'ʟ', 'm': 'ᴍ', 'n': 'ɴ', 'o': 'ᴏ', 'p': 'ᴘ', 'q': 'ǫ', 'r': 'ʀ', 's': 's', 't': 'ᴛ',
         'u': 'ᴜ', 'v': 'ᴠ', 'w': 'ᴡ', 'x': 'x', 'y': 'ʏ', 'z': 'ᴢ',
         '0': '𝟶', '1': '𝟷', '2': '𝟸', '3': '𝟹', '4': '𝟺', '5': '𝟻', '6': '𝟼', '7': '𝟽', '8': '𝟾', '9': '𝟿',
         ' ': ' ', '.': '.', ',': ',', '!': '!', '?': '?', '-': '-', '_': '_', '/': '/', '\\': '\\',
-        '(': '(', ')': ')', '[': '[', ']': ']', '{': '{', '}': '}', 
+        '(': '(', ')': ')', '[': '[', ']': ']', '{': '{', '}': '}',
         '@': '@', '#': '#', '$': '$', '%': '%', '&': '&', '*': '*', '+': '+', '=': '=',
         ':': ':', ';': ';', '<': '<', '>': '>'
     }
@@ -126,28 +126,37 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     
     btn = []
     
-    # File buttons with regular font
-    if settings['button']:
+    # FIX 1: New button format (Emoji + Filename + Size)
+    if files:
         for file in files:
             btn.append([
                 InlineKeyboardButton(
-                    text=f"{file.file_name}",
+                    text=f"📁 {file.file_name} - {get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}'
                 )
             ])
-    else:
-        for file in files:
-            btn.append([
-                InlineKeyboardButton(
-                    text=f"{file.file_name}",
-                    callback_data=f'{pre}#{file.file_id}',
-                ),
-                InlineKeyboardButton(
-                    text=f"{get_size(file.file_size)}",
-                    callback_data=f'{pre}#{file.file_id}',
-                )
-            ])
     
+    # FIX 2: New button order and "Select Options" button
+    if files:
+        btn.append([InlineKeyboardButton(text="👇 Sᴇʟᴇᴄᴛ Yᴏᴜʀ Oᴘᴛɪᴏɴs 👇", callback_data="pages")])
+
+    # Pagination
+    req = query.from_user.id if query.from_user else 0
+    current_page = math.ceil(offset / 10) + 1
+    total_pages = math.ceil(total_results / 10)
+    
+    pagination_buttons = []
+    if offset > 0:
+        pagination_buttons.append(InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}"))
+    
+    pagination_buttons.append(InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"))
+    
+    if n_offset != 0 and n_offset < total_results:
+        pagination_buttons.append(InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}"))
+    
+    if pagination_buttons:
+        btn.append(pagination_buttons)
+        
     # Filter buttons row
     btn.append([
         InlineKeyboardButton(text=to_fancy_font(f"Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
@@ -158,23 +167,6 @@ async def run_filtered_search(client, query, key, back_to_main=False):
         InlineKeyboardButton(text=to_fancy_font(f"Season ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}"),
         InlineKeyboardButton(text=to_fancy_font("Send All Files"), callback_data=f"sendall_{key}")
     ])
-    
-    # Pagination
-    req = query.from_user.id if query.from_user else 0
-    current_page = math.ceil(offset / 10) + 1
-    total_pages = math.ceil(total_results / 10)
-    
-    if offset > 0:
-        btn.append([
-            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}"),
-            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
-            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}") if n_offset != 0 and n_offset < total_results else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
-        ])
-    else:
-        btn.append([
-            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
-            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}") if n_offset != 0 and n_offset < total_results else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
-        ])
         
     btn.append([
         InlineKeyboardButton(
@@ -183,8 +175,8 @@ async def run_filtered_search(client, query, key, back_to_main=False):
         )
     ])
 
-    # FIXED: User mention without fancy font
-    user_mention = query.from_user.mention if query.from_user else 'User'
+    # FIX 3: Correct user mention using Markdown link
+    user_mention = f"[{query.from_user.first_name}](tg://user?id={query.from_user.id})" if query.from_user else 'User'
     chat_title = query.message.chat.title if query.message.chat.title else 'This Group'
     
     filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
@@ -263,27 +255,37 @@ async def next_page(bot, query):
     
     btn = []
     
-    if settings['button']:
+    # FIX 1: New button format (Emoji + Filename + Size) and FIX for file_size in callback
+    if files:
         for file in files:
             btn.append([
                 InlineKeyboardButton(
-                    text=f"{file.file_name}",
+                    text=f"📁 {file.file_name} - {get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}'
                 )
             ])
-    else:
-        for file in files:
-            btn.append([
-                InlineKeyboardButton(
-                    text=f"{file.file_name}",
-                    callback_data=f'{pre}#{file.file_id}',
-                ),
-                InlineKeyboardButton(
-                    text=f"{get_size(file.file_size)}",
-                    callback_data=f'{pre}#{file.file_size}',
-                )
-            ])
 
+    # FIX 2: New button order and "Select Options" button
+    if files:
+        btn.append([InlineKeyboardButton(text="👇 Sᴇʟᴇᴄᴛ Yᴏᴜʀ Oᴘᴛɪᴏɴs 👇", callback_data="pages")])
+
+    # Pagination
+    current_page = math.ceil(offset / 10) + 1
+    total_pages = math.ceil(total / 10)
+    
+    pagination_buttons = []
+    if offset > 0:
+        pagination_buttons.append(InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}"))
+    
+    pagination_buttons.append(InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"))
+    
+    if n_offset != 0 and n_offset < total:
+        pagination_buttons.append(InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}"))
+
+    if pagination_buttons:
+        btn.append(pagination_buttons)
+
+    # Filter buttons row
     btn.append([
         InlineKeyboardButton(text=to_fancy_font(f"Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
         InlineKeyboardButton(text=to_fancy_font(f"Language ({current_language or 'None'})"), callback_data=f"open_filter#language#{key}")
@@ -293,21 +295,6 @@ async def next_page(bot, query):
         InlineKeyboardButton(text=to_fancy_font(f"Season ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}"),
         InlineKeyboardButton(text=to_fancy_font("Send All Files"), callback_data=f"sendall_{key}")
     ])
-
-    current_page = math.ceil(offset / 10) + 1
-    total_pages = math.ceil(total / 10)
-    
-    if offset > 0:
-        btn.append([
-            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}"),
-            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
-            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}") if n_offset != 0 and n_offset < total else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
-        ])
-    else:
-        btn.append([
-            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
-            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}") if n_offset != 0 and n_offset < total else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
-        ])
         
     btn.append([
         InlineKeyboardButton(
@@ -316,7 +303,8 @@ async def next_page(bot, query):
         )
     ])
 
-    user_mention = query.from_user.mention if query.from_user else 'User'
+    # FIX 3: Correct user mention using Markdown link
+    user_mention = f"[{query.from_user.first_name}](tg://user?id={query.from_user.id})" if query.from_user else 'User'
     chat_title = query.message.chat.title if query.message.chat.title else 'This Group'
     filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
     
@@ -336,7 +324,7 @@ async def next_page(bot, query):
         parse_mode=enums.ParseMode.MARKDOWN
     )
     await query.answer()
-
+    
 @Client.on_callback_query(filters.regex(r"^sendall"))
 async def send_all_files(bot, query):
     _, key = query.data.split("_")
@@ -546,20 +534,24 @@ async def cb_handler(client: Client, query: CallbackQuery):
         await query.answer()
         await run_filtered_search(client, query, key, back_to_main=True)
     
-    # FIXED: Individual file sending issue
+    # FIX 4: Improved error handling for file fetching
     elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
         
-        # FIX: Better file details fetching
         try:
+            if not file_id.strip():
+                logger.warning(f"Received empty file_id in callback from user {query.from_user.id}")
+                return await query.answer('Invalid file ID.', show_alert=True)
+
             files_ = await get_file_details(file_id)
             if not files_:
-                return await query.answer('File not found in database.', show_alert=True)
+                logger.warning(f"File not found in DB for file_id: {file_id}")
+                return await query.answer('File not found in database. It might have been deleted.', show_alert=True)
             
             files = files_[0]
         except Exception as e:
-            logger.error(f"Error getting file details: {e}")
-            return await query.answer('Error fetching file details.', show_alert=True)
+            logger.error(f"Error getting file details for file_id '{file_id}': {e}", exc_info=True)
+            return await query.answer('Sorry, an error occurred while fetching file details.', show_alert=True)
             
         title = files.file_name
         size = get_size(files.file_size)
@@ -577,12 +569,10 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if f_caption is None:
             f_caption = f"{title}"
 
-        # Force Sub/Bot PM Check
         if (AUTH_CHANNEL and not await is_subscribed(client, query)) or settings['botpm']:
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
             return
         
-        # FIXED: Individual file sending with proper error handling
         try:
             sent_msg = await client.send_cached_media(
                 chat_id=query.from_user.id,
@@ -667,8 +657,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
         await query.answer('Piracy Is Crime')
 
-    # ... (other handlers remain same)
-
 async def auto_filter(client, msg, spoll=False):
     if not spoll:
         message = msg
@@ -715,27 +703,43 @@ async def auto_filter(client, msg, spoll=False):
     pre = 'filep' if settings['file_secure'] else 'file'
     btn = []
 
-    if settings["button"]:
+    # FIX 1: New button format (Emoji + Filename + Size) and FIX for file_size in callback
+    if files:
         for file in files:
             btn.append([
                 InlineKeyboardButton(
-                    text=f"{file.file_name}",
+                    text=f"📁 {file.file_name} - {get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}'
                 )
             ])
-    else:
-        for file in files:
-            btn.append([
-                InlineKeyboardButton(
-                    text=f"{file.file_name}",
-                    callback_data=f'{pre}#{file.file_id}',
-                ),
-                InlineKeyboardButton(
-                    text=f"{get_size(file.file_size)}",
-                    callback_data=f'{pre}#{file.file_id}',
-                )
-            ])
 
+    # FIX 2: New button order and "Select Options" button
+    if files:
+        btn.append([InlineKeyboardButton(text="👇 Sᴇʟᴇᴄᴛ Yᴏᴜʀ Oᴘᴛɪᴏɴs 👇", callback_data="pages")])
+    
+    req = message.from_user.id if message.from_user else 0
+    try:
+        int_offset = int(offset)
+    except:
+        int_offset = 0
+
+    # Pagination
+    current_page = math.ceil(int_offset / 10) + 1
+    total_pages = math.ceil(total_results / 10)
+
+    pagination_buttons = []
+    if int_offset > 0:
+        pagination_buttons.append(InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{int_offset-10}"))
+
+    pagination_buttons.append(InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"))
+
+    if int_offset + 10 < total_results:
+        pagination_buttons.append(InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{int_offset+10}"))
+    
+    if pagination_buttons:
+        btn.append(pagination_buttons)
+
+    # Filter buttons
     btn.append([
         InlineKeyboardButton(text=to_fancy_font("Quality"), callback_data=f"open_filter#quality#{key}"),
         InlineKeyboardButton(text=to_fancy_font("Language"), callback_data=f"open_filter#language#{key}")
@@ -745,29 +749,7 @@ async def auto_filter(client, msg, spoll=False):
         InlineKeyboardButton(text=to_fancy_font("Season"), callback_data=f"open_filter#season#{key}"),
         InlineKeyboardButton(text=to_fancy_font("Send All Files"), callback_data=f"sendall_{key}")
     ])
-
-    req = message.from_user.id if message.from_user else 0
     
-    try:
-        int_offset = int(offset)
-    except:
-        int_offset = 0
-
-    current_page = math.ceil(int_offset / 10) + 1
-    total_pages = math.ceil(total_results / 10)
-    
-    if int_offset > 0:
-        btn.append([
-            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{int_offset-10}"),
-            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
-            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{int_offset+10}") if int_offset + 10 < total_results else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
-        ])
-    else:
-        btn.append([
-            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
-            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{int_offset+10}") if int_offset + 10 < total_results else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
-        ])
-
     btn.append([
         InlineKeyboardButton(
             text=to_fancy_font("Check Bot PM"), 
@@ -775,7 +757,8 @@ async def auto_filter(client, msg, spoll=False):
         )
     ])
 
-    user_mention = message.from_user.mention if message.from_user else 'User'
+    # FIX 3: Correct user mention using Markdown link
+    user_mention = f"[{message.from_user.first_name}](tg://user?id={message.from_user.id})" if message.from_user else 'User'
     chat_title = message.chat.title if message.chat.title else 'This Group'
     
     custom_msg = f"""
@@ -792,35 +775,14 @@ async def auto_filter(client, msg, spoll=False):
     
     if imdb:
         cap = TEMPLATE.format(
-            query=search,
-            title=imdb['title'],
-            votes=imdb['votes'],
-            aka=imdb["aka"],
-            seasons=imdb["seasons"],
-            box_office=imdb['box_office'],
-            localized_title=imdb['localized_title'],
-            kind=imdb['kind'],
-            imdb_id=imdb["imdb_id"],
-            cast=imdb["cast"],
-            runtime=imdb["runtime"],
-            countries=imdb["countries"],
-            certificates=imdb["certificates"],
-            languages=imdb["languages"],
-            director=imdb["director"],
-            writer=imdb["writer"],
-            producer=imdb["producer"],
-            composer=imdb["composer"],
-            cinematographer=imdb["cinematographer"],
-            music_team=imdb["music_team"],
-            distributors=imdb["distributors"],
-            release_date=imdb['release_date'],
-            year=imdb['year'],
-            genres=imdb['genres'],
-            poster=imdb['poster'],
-            plot=imdb['plot'],
-            rating=imdb['rating'],
-            url=imdb['url'],
-            **locals()
+            query=search, title=imdb['title'], votes=imdb['votes'], aka=imdb["aka"], seasons=imdb["seasons"],
+            box_office=imdb['box_office'], localized_title=imdb['localized_title'], kind=imdb['kind'],
+            imdb_id=imdb["imdb_id"], cast=imdb["cast"], runtime=imdb["runtime"], countries=imdb["countries"],
+            certificates=imdb["certificates"], languages=imdb["languages"], director=imdb["director"],
+            writer=imdb["writer"], producer=imdb["producer"], composer=imdb["composer"],
+            cinematographer=imdb["cinematographer"], music_team=imdb["music_team"], distributors=imdb["distributors"],
+            release_date=imdb['release_date'], year=imdb['year'], genres=imdb['genres'], poster=imdb['poster'],
+            plot=imdb['plot'], rating=imdb['rating'], url=imdb['url'], **locals()
         )
         cap += "\n\n" + custom_msg
     else:
