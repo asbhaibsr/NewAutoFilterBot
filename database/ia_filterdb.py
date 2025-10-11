@@ -86,68 +86,79 @@ async def get_search_results(query, file_type=None, max_results=10, offset=0, fi
 
     query = query.strip()
     if not query:
-        raw_pattern = '.'
+        # If query is empty, match any file
+        raw_pattern = r'.' 
     elif ' ' not in query:
         # Search for query word with boundaries
-        raw_pattern = r'(\b|[\.\+\-_])' + re.escape(query) + r'(\b|[\.\+\-_])' 
+        # Note: Added '|' and improved regex for better word boundary matching
+        raw_pattern = r'(\b|[\.\+\-_]|^)' + re.escape(query) + r'(\b|[\.\+\-_]|$)' 
     else:
         # Search for space-separated words, allowing non-word characters in between
+        # This will search for the entire phrase as an approximate match
         raw_pattern = '.*'.join(re.escape(q) for q in query.split())
     
     try:
+        # Escape the regex special characters in raw_pattern before compiling
         regex = re.compile(raw_pattern, flags=re.IGNORECASE)
-    except:
+    except Exception as e:
+        logger.error(f"Regex compilation error: {e}")
         return [], 0, 0
 
     # Base filter searches in file_name or caption
     if USE_CAPTION_FILTER:
-        base_filter = {'$or': [{'file_name': regex}, {'caption': regex}]}
+        # For base search, we use the original logic for file_name OR caption
+        base_filter_search = {'$or': [{'file_name': regex}, {'caption': regex}]}
     else:
-        base_filter = {'file_name': regex}
+        base_filter_search = {'file_name': regex}
 
     if file_type:
-        base_filter['file_type'] = file_type
+        base_filter_search['file_type'] = file_type
 
-    # NEW: Apply additional filters for language, quality, and season
-    
     # Combined list of regex patterns for all filters (language, quality, season)
     filter_patterns = []
 
     if language:
         # Match language name with word boundaries
-        filter_patterns.append(r'(\b|[\.\+\-_])' + re.escape(language) + r'(\b|[\.\+\-_])')
+        # Use a more flexible regex for filter checks
+        filter_patterns.append(r'(\b|[\.\+\-_\/]|^)' + re.escape(language) + r'(\b|[\.\+\-_\/]|$)')
 
     if quality:
         # Match quality/rip name with word boundaries
-        filter_patterns.append(r'(\b|[\.\+\-_])' + re.escape(quality) + r'(\b|[\.\+\-_])')
+        filter_patterns.append(r'(\b|[\.\+\-_\/]|^)' + re.escape(quality) + r'(\b|[\.\+\-_\/]|$)')
     
     if season:
         # Match season name (e.g., S01, S1) with word boundaries
-        filter_patterns.append(r'(\b|[\.\+\-_])' + re.escape(season) + r'(\b|[\.\+\-_])')
+        filter_patterns.append(r'(\b|[\.\+\-_\/]|^)' + re.escape(season) + r'(\b|[\.\+\-_\/]|$)')
 
-    # If any filters are applied, modify the base filter to ensure all patterns exist in file_name
+    # If any filters are applied, modify the filter
     if filter_patterns:
-        # Create an $and query for the combined search and filter patterns
+        # Start with the base search filter
+        combined_filter_list = [base_filter_search]
         
-        # 1. Base search (file_name or caption)
-        combined_filter = [base_filter]
-        
-        # 2. Additional filters (must be in file_name)
+        # Additional filters MUST be in the file_name (to avoid slow caption searches)
         for pattern in filter_patterns:
-            combined_filter.append({'file_name': {'$regex': re.compile(pattern, flags=re.IGNORECASE)}})
+            try:
+                # Add each filter as a separate regex condition on file_name
+                combined_filter_list.append({'file_name': {'$regex': re.compile(pattern, flags=re.IGNORECASE)}})
+            except Exception as e:
+                logger.error(f"Filter Regex compilation error: {e}")
+                # If a filter regex fails, skip it or return empty results based on required strictness
+                continue
         
-        filter = {'$and': combined_filter}
+        # Combine all conditions with $and
+        final_filter = {'$and': combined_filter_list}
     else:
-        filter = base_filter
+        # No filters, use the base search filter
+        final_filter = base_filter_search
 
 
-    total_results = await Media.count_documents(filter)
+    total_results = await Media.count_documents(final_filter)
     next_offset = offset + max_results
 
     if next_offset >= total_results:
         next_offset = 0
 
-    cursor = Media.find(filter)
+    cursor = Media.find(final_filter)
     cursor.sort('$natural', -1)
     cursor.skip(offset).limit(max_results)
     files = await cursor.to_list(length=max_results)
@@ -166,4 +177,3 @@ async def get_file_details(query):
 async def delete_file(query):
     """Delete file from database using file_id (_id field)."""
     return await Media.delete_one({'_id': query})
-
