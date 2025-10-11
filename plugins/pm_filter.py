@@ -33,7 +33,9 @@ async def schedule_delete(message, delay_seconds):
     """Deletes the message after a specified delay."""
     await asyncio.sleep(delay_seconds)
     try:
-        await message.delete()
+        # सुनिश्चित करें कि मैसेज डिलीट करने लायक है (टेक्स्ट या मीडिया)
+        if message and message.id:
+            await message.delete()
     except Exception as e:
         logger.warning(f"Error deleting message: {e}")
 
@@ -68,11 +70,12 @@ async def next_page(bot, query):
         return
 
     settings = await get_settings(query.message.chat.id)
+    pre = 'filep' if settings['file_secure'] else 'file'
     if settings['button']:
         btn = [
             [
                 InlineKeyboardButton(
-                    text=f"[{get_size(file.file_size)}] {file.file_name}", callback_data=f'files#{file.file_id}'
+                    text=f"[{get_size(file.file_size)}] {file.file_name}", callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
             for file in files
@@ -81,11 +84,11 @@ async def next_page(bot, query):
         btn = [
             [
                 InlineKeyboardButton(
-                    text=f"{file.file_name}", callback_data=f'files#{file.file_id}'
+                    text=f"{file.file_name}", callback_data=f'{pre}#{file.file_id}'
                 ),
                 InlineKeyboardButton(
                     text=f"{get_size(file.file_size)}",
-                    callback_data=f'files_#{file.file_id}',
+                    callback_data=f'{pre}#{file.file_id}',
                 ),
             ]
             for file in files
@@ -98,14 +101,12 @@ async def next_page(bot, query):
 
     next_btn = f"next_{req}_{key}_{n_offset}" if n_offset != 0 else None
 
-    # MODIFIED: पुरानी 'Remove ads' और 'SEND ALL' रो हटा दी गई है।
-    
-    # NEW: आपके अनुरोध के अनुसार बटन जोड़े गए (Quality, Language, Season)
+    # MODIFIED: चेतावनी संदेश हटाने के लिए नए डमी कॉलबैक
     btn.append(
         [
-            InlineKeyboardButton(text="QUALITY", callback_data="dummy_q"), # DUMMY CALLBACK
-            InlineKeyboardButton(text="LANGUAGE", callback_data="dummy_l"), # DUMMY CALLBACK
-            InlineKeyboardButton(text="SEASON", callback_data="dummy_s") # DUMMY CALLBACK
+            InlineKeyboardButton(text="QUALITY", callback_data="filter_q_dummy"),
+            InlineKeyboardButton(text="LANGUAGE", callback_data="filter_l_dummy"),
+            InlineKeyboardButton(text="SEASON", callback_data="filter_s_dummy")
         ]
     )
     
@@ -142,7 +143,7 @@ async def next_page(bot, query):
 async def advantage_spoll_choker(bot, query):
     _, user, movie_ = query.data.split('#')
     if int(user) != 0 and query.from_user.id != int(user):
-        return await query.answer("okDa", show_alert=True)
+        return await query.answer("oKda", show_alert=True)
     if movie_ == "close_spellcheck":
         return await query.message.delete()
     movies = SPELL_CHECK.get(query.message.reply_to_message.id)
@@ -167,12 +168,13 @@ async def cb_handler(client: Client, query: CallbackQuery):
     if query.data == "close_data":
         await query.message.delete()
         
-    # NEW: आपके डमी बटनों के लिए हैंडलर
-    elif query.data in ["dummy_q", "dummy_l", "dummy_s"]:
-        await query.answer("यह फ़िल्टरिंग विकल्प अभी उपलब्ध नहीं है। 🚧", show_alert=True)
+    # NEW: आपके डमी बटनों के लिए हैंडलर (चेतावनी संदेश हटा दिया गया)
+    elif query.data in ["filter_q_dummy", "filter_l_dummy", "filter_s_dummy"]:
+        # query.answer() without a message will just close the loading animation
+        await query.answer() 
     
     elif query.data.startswith("sendall"):
-        # SEND ALL बटन के लिए डमी हैंडलर - अब यह केवल एक संदेश दिखाएगा
+        # SEND ALL बटन के लिए डमी हैंडलर
         await query.answer("SEND ALL फ़ीचर के लिए कृपया PM में जाँच करें।", show_alert=True)
     
     # बाकी cb_handler लॉजिक
@@ -362,16 +364,20 @@ async def cb_handler(client: Client, query: CallbackQuery):
             alert = alerts[int(i)]
             alert = alert.replace("\\n", "\n").replace("\\t", "\t")
             await query.answer(alert, show_alert=True)
+    
+    # PM ISSUE FIX: File Sending Logic 
     if query.data.startswith("file"):
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
         if not files_:
             return await query.answer('No such file exist.')
+        
         files = files_[0]
         title = files.file_name
         size = get_size(files.file_size)
         f_caption = files.caption
         settings = await get_settings(query.message.chat.id)
+        
         if CUSTOM_FILE_CAPTION:
             try:
                 f_caption = CUSTOM_FILE_CAPTION.format(file_name='' if title is None else title,
@@ -383,30 +389,34 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if f_caption is None:
             f_caption = f"{files.file_name}"
 
+        # 1. Force Sub/Bot PM Check
+        if (AUTH_CHANNEL and not await is_subscribed(client, query)) or settings['botpm']:
+            # Force user to PM the bot to get the file/check sub
+            await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
+            return
+        
+        # 2. Try sending the file to PM (The main fix for PM issue)
         try:
-            if AUTH_CHANNEL and not await is_subscribed(client, query):
-                await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
-                return
-            elif settings['botpm']:
-                await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
-                return
-            else:
-                sent_msg = await client.send_cached_media(
-                    chat_id=query.from_user.id,
-                    file_id=file_id,
-                    caption=f_caption,
-                    protect_content=True if ident == "filep" else False 
-                )
-                # NEW: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
-                asyncio.create_task(schedule_delete(sent_msg, 300))
-                # NEW: यूजर को बताया गया कि फाइल डिलीट हो जाएगी
-                await query.answer('Check PM, I have sent the file. It will be deleted in 5 minutes.', show_alert=True)
+            sent_msg = await client.send_cached_media(
+                chat_id=query.from_user.id,
+                file_id=file_id,
+                caption=f_caption,
+                protect_content=True if ident == "filep" else False 
+            )
+            
+            asyncio.create_task(schedule_delete(sent_msg, 300))
+            await query.answer('Check PM, I have sent the file. It will be deleted in 5 minutes.', show_alert=True)
+            
         except UserIsBlocked:
-            await query.answer('Unblock the bot mahn !', show_alert=True)
+            await query.answer('Unblock the bot first!', show_alert=True)
         except PeerIdInvalid:
+            # This handles the case where the user hasn't started the bot yet.
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
         except Exception as e:
+            # Catch all other errors and redirect to PM as a fallback
+            logger.exception(f"Error sending file to PM: {e}")
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
+            
     elif query.data.startswith("checksub"):
         if AUTH_CHANNEL and not await is_subscribed(client, query):
             await query.answer("I Like Your Smartness, But Don't Be Oversmart 😒", show_alert=True)
@@ -678,7 +688,9 @@ async def auto_filter(client, msg, spoll=False):
                         "यह या तो अभी **रिलीज़ नहीं हुई है**, या फिर आपने **स्पेलिंग गलत** डाली है।\n\n"
                         "कृपया स्पेलिंग चेक करके दोबारा प्रयास करें। ✨"
                     )
-                    await msg.reply_text(not_found_text, quote=True)
+                    not_found_message = await msg.reply_text(not_found_text, quote=True)
+                    # NEW: नॉट फाउंड मैसेज को 10 सेकंड बाद हटाने के लिए शेड्यूल किया गया
+                    asyncio.create_task(schedule_delete(not_found_message, 10))
                     return
         else:
             return
@@ -712,15 +724,13 @@ async def auto_filter(client, msg, spoll=False):
             for file in files
         ]
 
-    # MODIFIED: 'Remove ads' और 'SEND ALL' वाली रो हटा दी गई है।
-    
-    # NEW: आपके अनुरोध के अनुसार बटन जोड़े गए (Quality, Language, Season)
+    # MODIFIED: चेतावनी संदेश हटाने के लिए नए डमी कॉलबैक
     key = f"{message.chat.id}-{message.id}"
     btn.append(
         [
-            InlineKeyboardButton(text="QUALITY", callback_data="dummy_q"), # DUMMY CALLBACK
-            InlineKeyboardButton(text="LANGUAGE", callback_data="dummy_l"), # DUMMY CALLBACK
-            InlineKeyboardButton(text="SEASON", callback_data="dummy_s") # DUMMY CALLBACK
+            InlineKeyboardButton(text="QUALITY", callback_data="filter_q_dummy"),
+            InlineKeyboardButton(text="LANGUAGE", callback_data="filter_l_dummy"),
+            InlineKeyboardButton(text="SEASON", callback_data="filter_s_dummy")
         ]
     )
     
@@ -818,8 +828,8 @@ async def advantage_spell_chok(msg):
     gs_parsed = []
     if not g_s:
         k = await msg.reply("I couldn't find any movie in that name.")
-        await asyncio.sleep(8)
-        await k.delete()
+        # MODIFIED: संदेश को 8 सेकंड बाद हटाने के लिए शेड्यूल किया गया
+        asyncio.create_task(schedule_delete(k, 8))
         return
     regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)
     gs = list(filter(regex.match, g_s))
@@ -847,8 +857,8 @@ async def advantage_spell_chok(msg):
     movielist = list(dict.fromkeys(movielist))
     if not movielist:
         k = await msg.reply("I couldn't find anything related to that. Check your spelling")
-        await asyncio.sleep(8)
-        await k.delete()
+        # MODIFIED: संदेश को 8 सेकंड बाद हटाने के लिए शेड्यूल किया गया
+        asyncio.create_task(schedule_delete(k, 8))
         return
     SPELL_CHECK[msg.id] = movielist
     btn = [[
