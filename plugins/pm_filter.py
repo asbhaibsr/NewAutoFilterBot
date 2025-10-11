@@ -5,21 +5,15 @@ import math
 from pyrogram.errors.exceptions.bad_request_400 import MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty
 from Script import script
 import pyrogram
-from database.connections_mdb import active_connection, all_connections, delete_connection, if_active, make_active, \
-    make_inactive
-from info import ADMINS, AUTH_CHANNEL, AUTH_USERS, CUSTOM_FILE_CAPTION, AUTH_GROUPS, P_TTI_SHOW_OFF, IMDB, \
-    SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE
+from database.connections_mdb import active_connection, all_connections, delete_connection, if_active, make_active, make_inactive
+from info import ADMINS, AUTH_CHANNEL, AUTH_USERS, CUSTOM_FILE_CAPTION, AUTH_GROUPS, P_TTI_SHOW_OFF, IMDB, SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait, UserIsBlocked, MessageNotModified, PeerIdInvalid
 from utils import get_size, is_subscribed, get_poster, search_gagala, temp, get_settings, save_group_settings
 from database.users_chats_db import db
 from database.ia_filterdb import Media, get_file_details, get_search_results
-from database.filters_mdb import (
-    del_all,
-    find_filter,
-    get_filters,
-)
+from database.filters_mdb import del_all, find_filter, get_filters
 import logging
 
 logger = logging.getLogger(__name__)
@@ -28,25 +22,26 @@ logger.setLevel(logging.ERROR)
 BUTTONS = {}
 SPELL_CHECK = {}
 
-# Helper function to convert text to the desired fancy font
+# Enhanced fancy font converter
 def to_fancy_font(text):
-    """Converts a string to a fancy font style (small capitals/fancy letters)."""
+    """Converts text to fancy font style"""
     mapping = {
-        'A': 'ᴀ', 'B': 'ʙ', 'C': 'ᴄ', 'D': 'ᴅ', 'E': 'ᴇ', 'F': 'ꜰ', 'G': 'ɢ', 'H': 'ʜ', 'I': 'ɪ', 'J': 'ᴊ', 'K': 'ᴋ', 'L': 'ʟ', 'M': 'ᴍ',
-        'N': 'ɴ', 'O': 'ᴏ', 'P': 'ᴘ', 'Q': 'Q', 'R': 'ʀ', 'S': 's', 'T': 'ᴛ', 'U': 'ᴜ', 'V': 'ᴠ', 'W': 'ᴡ', 'X': 'x', 'Y': 'ʏ', 'Z': 'ᴢ',
-        'a': 'ᴀ', 'b': 'ʙ', 'c': 'ᴄ', 'd': 'ᴅ', 'e': 'ᴇ', 'f': 'ꜰ', 'g': 'ɢ', 'h': 'ʜ', 'i': 'ɪ', 'j': 'ᴊ', 'k': 'ᴋ', 'l': 'ʟ', 'm': 'ᴍ',
-        'n': 'ɴ', 'o': 'ᴏ', 'p': 'ᴘ', 'q': 'Q', 'r': 'ʀ', 's': 's', 't': 'ᴛ', 'u': 'ᴜ', 'v': 'ᴠ', 'w': 'ᴡ', 'x': 'x', 'y': 'ʏ', 'z': 'ᴢ',
-        '0': '𝟶', '1': '𝟷', '2': '𝟸', '3': '𝟹', '4': '𝟺', '5': '𝟻', '6': '𝟼', '7': '𝟽', '8': '𝟾', '9': '𝟿', 
-        ' ': ' ', '/': '/', '#': '#', '_': '_', '-': '-', '[': '[', ']': ']', '(': '(', ')': ')', '{': '{', '}': '}', '<': '<', '>': '>'
+        'A': 'ᴀ', 'B': 'ʙ', 'C': 'ᴄ', 'D': 'ᴅ', 'E': 'ᴇ', 'F': 'ꜰ', 'G': 'ɢ', 'H': 'ʜ', 'I': 'ɪ', 'J': 'ᴊ', 
+        'K': 'ᴋ', 'L': 'ʟ', 'M': 'ᴍ', 'N': 'ɴ', 'O': 'ᴏ', 'P': 'ᴘ', 'Q': 'ǫ', 'R': 'ʀ', 'S': 's', 'T': 'ᴛ', 
+        'U': 'ᴜ', 'V': 'ᴠ', 'W': 'ᴡ', 'X': 'x', 'Y': 'ʏ', 'Z': 'ᴢ',
+        'a': 'ᴀ', 'b': 'ʙ', 'c': 'ᴄ', 'd': 'ᴅ', 'e': 'ᴇ', 'f': 'ꜰ', 'g': 'ɢ', 'h': 'ʜ', 'i': 'ɪ', 'j': 'ᴊ',
+        'k': 'ᴋ', 'l': 'ʟ', 'm': 'ᴍ', 'n': 'ɴ', 'o': 'ᴏ', 'p': 'ᴘ', 'q': 'ǫ', 'r': 'ʀ', 's': 's', 't': 'ᴛ',
+        'u': 'ᴜ', 'v': 'ᴠ', 'w': 'ᴡ', 'x': 'x', 'y': 'ʏ', 'z': 'ᴢ',
+        '0': '𝟶', '1': '𝟷', '2': '𝟸', '3': '𝟹', '4': '𝟺', '5': '𝟻', '6': '𝟼', '7': '𝟽', '8': '𝟾', '9': '𝟿',
+        ' ': ' ', '.': '.', ',': ',', '!': '!', '?': '?', '-': '-', '_': '_', '/': '/', '\\': '\\',
+        '(': '(', ')': ')', '[': '[', ']': ']', '{': '{', '}': '}'
     }
     return ''.join(mapping.get(char, char) for char in text)
 
-# NEW: यह फंक्शन अब किसी भी मैसेज को दिए गए समय के बाद डिलीट कर सकता है
 async def schedule_delete(message, delay_seconds):
-    """Deletes the message after a specified delay."""
+    """Delete message after specified delay"""
     await asyncio.sleep(delay_seconds)
     try:
-        # सुनिश्चित करें कि मैसेज डिलीट करने लायक है (टेक्स्ट या मीडिया)
         if message and message.id:
             await message.delete()
     except Exception as e:
@@ -58,7 +53,6 @@ async def give_filter(client, message):
     if k == False:
         await auto_filter(client, message)
 
-
 @Client.on_callback_query(filters.regex(r"^next"))
 async def next_page(bot, query):
     ident, req, key, offset = query.data.split("_")
@@ -68,6 +62,7 @@ async def next_page(bot, query):
         offset = int(offset)
     except:
         offset = 0
+    
     search = BUTTONS.get(key)
     if not search:
         await query.answer("You are using one of my old messages, please send the request again.", show_alert=True)
@@ -84,12 +79,14 @@ async def next_page(bot, query):
 
     settings = await get_settings(query.message.chat.id)
     pre = 'filep' if settings['file_secure'] else 'file'
+    
+    # File buttons
     if settings['button']:
         btn = [
             [
-                # MODIFIED: बटन फ़ॉन्ट और इमोजी का उपयोग
                 InlineKeyboardButton(
-                    text=f"[{to_fancy_font(get_size(file.file_size))}] {to_fancy_font(file.file_name)}", callback_data=f'{pre}#{file.file_id}'
+                    text=f"📁 {to_fancy_font(file.file_name)}",
+                    callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
             for file in files
@@ -97,9 +94,9 @@ async def next_page(bot, query):
     else:
         btn = [
             [
-                # MODIFIED: बटन फ़ॉन्ट और इमोजी का उपयोग
                 InlineKeyboardButton(
-                    text=f"📂 {to_fancy_font(file.file_name)}", callback_data=f'{pre}#{file.file_id}'
+                    text=f"📂 {to_fancy_font(file.file_name)}",
+                    callback_data=f'{pre}#{file.file_id}',
                 ),
                 InlineKeyboardButton(
                     text=f"💾 {to_fancy_font(get_size(file.file_size))}",
@@ -109,58 +106,197 @@ async def next_page(bot, query):
             for file in files
         ]
 
+    # Filter buttons row
+    btn.append([
+        InlineKeyboardButton(text="🎬 Qᴜᴀʟɪᴛʏ", callback_data="quality_dummy"),
+        InlineKeyboardButton(text="🌐 Lᴀɴɢᴜᴀɢᴇ", callback_data="language_dummy"),
+        InlineKeyboardButton(text="📺 Sᴇᴀsᴏɴ", callback_data="season_dummy")
+    ])
+    
+    # Chennai Express specific session buttons
+    chennai_sessions = []
+    for i in range(1, 51):
+        session_num = f"{i:02d}"
+        chennai_sessions.append(
+            InlineKeyboardButton(
+                text=f"S{session_num}", 
+                callback_data=f"session_{session_num}"
+            )
+        )
+    
+    # Add session buttons in rows of 5
+    for i in range(0, len(chennai_sessions), 5):
+        btn.append(chennai_sessions[i:i+5])
+    
+    # Indian language buttons
+    indian_languages = [
+        ("Hindi", "lang_hindi"),
+        ("Tamil", "lang_tamil"), 
+        ("Telugu", "lang_telugu"),
+        ("Malayalam", "lang_malayalam"),
+        ("Kannada", "lang_kannada"),
+        ("Bengali", "lang_bengali"),
+        ("Marathi", "lang_marathi"),
+        ("Gujarati", "lang_gujarati"),
+        ("Punjabi", "lang_punjabi")
+    ]
+    
+    lang_buttons = []
+    for lang_name, lang_data in indian_languages:
+        lang_buttons.append(
+            InlineKeyboardButton(
+                text=to_fancy_font(lang_name),
+                callback_data=lang_data
+            )
+        )
+    
+    # Add language buttons in rows of 3
+    for i in range(0, len(lang_buttons), 3):
+        btn.append(lang_buttons[i:i+3])
+    
+    # Send All Files button
+    btn.append([
+        InlineKeyboardButton(
+            text="🚀 Sᴇɴᴅ Aʟʟ Fɪʟᴇs", 
+            callback_data=f"sendall_{key}"
+        )
+    ])
+    
+    # Check Bot PM button
+    btn.append([
+        InlineKeyboardButton(
+            text="🔍 Cʜᴇᴄᴋ Bᴏᴛ PM", 
+            url=f"https://t.me/{temp.U_NAME}"
+        )
+    ])
+
+    # Pagination
     current_page = math.ceil(int(offset) / 10) + 1
     total_pages = math.ceil(total / 10)
     
-    off_set = offset - 10 if offset > 0 else None
-
-    next_btn = f"next_{req}_{key}_{n_offset}" if n_offset != 0 else None
-
-    # MODIFIED: चेतावनी संदेश हटाने के लिए नए डमी कॉलबैक (फ़ॉन्ट और इमोजी के साथ)
-    btn.append(
-        [
-            InlineKeyboardButton(text=to_fancy_font("Qᴜᴀʟɪᴛʏ"), callback_data="filter_q_dummy"),
-            InlineKeyboardButton(text=to_fancy_font("Lᴀɴɢᴜᴀɢᴇ"), callback_data="filter_l_dummy"),
-            InlineKeyboardButton(text=to_fancy_font("Sᴇᴀsᴏɴ"), callback_data="filter_s_dummy")
-        ]
-    )
-    
-    # NEW: 'Check Bot PM For File' बटन जोड़ा गया (फ़ॉन्ट और इमोजी के साथ)
-    btn.append(
-        [InlineKeyboardButton(text="👉 ᴄʜᴇᴄᴋ ʙᴏᴛ ᴘᴍ ғᴏʀ ғɪʟᴇ 👈", url=f"https://t.me/{temp.U_NAME}")]
-    )
-    
-    # MODIFIED: पेजिनेशन बटन (आपकी आवश्यकतानुसार)
     pagination_buttons = []
+    if offset > 0:
+        pagination_buttons.append(
+            InlineKeyboardButton("⏪ Bᴀᴄᴋ", callback_data=f"next_{req}_{key}_{offset-10}")
+        )
     
-    # MODIFIED: '⏪ BACK' बटन का फ़ॉन्ट और इमोजी
-    if off_set is not None:
-        pagination_buttons.append(InlineKeyboardButton("« ʙᴀᴄᴋ", callback_data=f"next_{req}_{key}_{off_set}"))
+    pagination_buttons.append(
+        InlineKeyboardButton(f"📄 {current_page}/{total_pages}", callback_data="pages")
+    )
     
-    # MODIFIED: पेजिनेशन टेक्स्ट (Pages Button) का फ़ॉन्ट और इमोजी
-    # पुरानी रिक्वेस्ट: [No more page available] -> इसे सिर्फ तभी दिखाना चाहिए जब आगे कोई पेज न हो।
-    # Pagination Logic:
-    if off_set is None and next_btn is None: # Only 1 page
-         pagination_buttons.append(InlineKeyboardButton("🗓 ғɪʟᴇs 𝟷/𝟷", callback_data="pages"))
-    elif off_set is not None or next_btn is not None:
-        pagination_buttons.append(InlineKeyboardButton(f"🗓 ᴘᴀɢᴇs {current_page}/{total_pages}", callback_data="pages"))
+    if n_offset != 0:
+        pagination_buttons.append(
+            InlineKeyboardButton("Nᴇxᴛ ⏩", callback_data=f"next_{req}_{key}_{n_offset}")
+        )
     
-    # MODIFIED: 'NEXT ⏩' बटन का फ़ॉन्ट और इमोजी
-    if next_btn is not None:
-        pagination_buttons.append(InlineKeyboardButton("ɴᴇxᴛ »", callback_data=next_btn))
-
     if pagination_buttons:
         btn.append(pagination_buttons)
 
-
     try:
-        await query.edit_message_reply_markup(
-            reply_markup=InlineKeyboardMarkup(btn)
-        )
+        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(btn))
     except MessageNotModified:
         pass
     await query.answer()
 
+@Client.on_callback_query(filters.regex(r"^sendall"))
+async def send_all_files(bot, query):
+    """Send all files to PM at once"""
+    _, key = query.data.split("_")
+    
+    search = BUTTONS.get(key)
+    if not search:
+        await query.answer("Search expired. Please search again.", show_alert=True)
+        return
+    
+    await query.answer("Sending all files to your PM...", show_alert=True)
+    
+    # Get all files for this search
+    all_files = []
+    offset = 0
+    while True:
+        files, next_offset, total = await get_search_results(search, offset=offset, max_results=100, filter=True)
+        all_files.extend(files)
+        
+        if not next_offset:
+            break
+        offset = next_offset
+    
+    if not all_files:
+        await query.message.reply_text("❌ No files found to send.")
+        return
+    
+    user_id = query.from_user.id
+    sent_count = 0
+    
+    # Send files to user's PM
+    for file in all_files:
+        try:
+            file_caption = file.caption or f"{file.file_name}"
+            if CUSTOM_FILE_CAPTION:
+                try:
+                    file_caption = CUSTOM_FILE_CAPTION.format(
+                        file_name=file.file_name,
+                        file_size=get_size(file.file_size),
+                        file_caption=file.caption or ""
+                    )
+                except Exception as e:
+                    logger.exception(e)
+            
+            # Send file to user's PM
+            sent_msg = await bot.send_cached_media(
+                chat_id=user_id,
+                file_id=file.file_id,
+                caption=file_caption,
+                protect_content=True
+            )
+            
+            sent_count += 1
+            
+            # Schedule deletion after 5 minutes
+            asyncio.create_task(schedule_delete(sent_msg, 300))
+            
+            # Small delay to avoid flooding
+            await asyncio.sleep(0.5)
+            
+        except UserIsBlocked:
+            await query.message.reply_text("❌ Please unblock the bot first!")
+            return
+        except Exception as e:
+            logger.error(f"Error sending file {file.file_name}: {e}")
+            continue
+    
+    # Notification
+    notification = await query.message.reply_text(
+        f"✅ Successfully sent {sent_count} files to your PM!\n"
+        f"📁 Files will be auto-deleted in 5 minutes.\n"
+        f"🔍 Search: `{search}`"
+    )
+    
+    # Delete notification after 10 seconds
+    asyncio.create_task(schedule_delete(notification, 10))
+
+@Client.on_callback_query(filters.regex(r"^session_"))
+async def handle_session(bot, query):
+    """Handle session button clicks"""
+    session_num = query.data.split("_")[1]
+    await query.answer(f"Selected Session {session_num}", show_alert=False)
+
+@Client.on_callback_query(filters.regex(r"^lang_"))
+async def handle_language(bot, query):
+    """Handle language button clicks"""
+    lang_code = query.data.split("_")[1]
+    lang_names = {
+        "hindi": "Hindi", "tamil": "Tamil", "telugu": "Telugu",
+        "malayalam": "Malayalam", "kannada": "Kannada", "bengali": "Bengali",
+        "marathi": "Marathi", "gujarati": "Gujarati", "punjabi": "Punjabi"
+    }
+    lang_name = lang_names.get(lang_code, "Unknown")
+    await query.answer(f"Selected {lang_name} language", show_alert=False)
+
+@Client.on_callback_query(filters.regex(r"^(quality|language|season)_dummy$"))
+async def handle_dummy_buttons(bot, query):
+    """Handle dummy filter buttons"""
+    await query.answer()
 
 @Client.on_callback_query(filters.regex(r"^spolling"))
 async def advantage_spoll_choker(bot, query):
@@ -182,25 +318,27 @@ async def advantage_spoll_choker(bot, query):
             await auto_filter(bot, query, k)
         else:
             k = await query.message.edit('This Movie Not Found In DataBase')
-            # MODIFIED: संदेश को 10 सेकंड बाद हटाने के लिए शेड्यूल किया गया
             asyncio.create_task(schedule_delete(k, 10))
-
 
 @Client.on_callback_query()
 async def cb_handler(client: Client, query: CallbackQuery):
     if query.data == "close_data":
         await query.message.delete()
-        
-    # NEW: आपके डमी बटनों के लिए हैंडलर (चेतावनी संदेश हटा दिया गया)
-    elif query.data in ["filter_q_dummy", "filter_l_dummy", "filter_s_dummy"]:
-        # query.answer() without a message will just close the loading animation
-        await query.answer() 
+    
+    elif query.data in ["quality_dummy", "language_dummy", "season_dummy"]:
+        await query.answer()
     
     elif query.data.startswith("sendall"):
-        # SEND ALL बटन के लिए डमी हैंडलर
-        await query.answer("sᴇɴᴅ ᴀʟʟ फ़ीचर के लिए कृपया ᴘᴍ में जाँच करें।", show_alert=True)
+        # This will be handled by the send_all_files function above
+        pass
     
-    # बाकी cb_handler लॉजिक
+    elif query.data.startswith("session_"):
+        # This will be handled by the handle_session function above  
+        pass
+    
+    elif query.data.startswith("lang_"):
+        # This will be handled by the handle_language function above
+        pass
     
     elif query.data == "delallconfirm":
         userid = query.from_user.id
@@ -427,7 +565,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 protect_content=True if ident == "filep" else False 
             )
             
-            # NEW: आपकी रिक्वेस्ट के अनुसार फ़ाइल के साथ चेतावनी मैसेज
+            # Warning message
             warning_message = f"""
 **ʜᴇʟʟᴏ** {query.from_user.mention},
 
@@ -487,10 +625,9 @@ async def cb_handler(client: Client, query: CallbackQuery):
             caption=f_caption,
             protect_content=True if ident == 'checksubp' else False
         )
-        # NEW: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+        # Schedule file deletion after 5 minutes
         asyncio.create_task(schedule_delete(sent_msg, 300))
 
-# ... (बाकी का cb_handler और अन्य फंक्शन्स का कोड जैसा था वैसा ही रहेगा) ...
     elif query.data == "pages":
         await query.answer()
     elif query.data == "start":
@@ -705,7 +842,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
             await query.message.edit_reply_markup(reply_markup)
     await query.answer('Piracy Is Crime')
 
-
 async def auto_filter(client, msg, spoll=False):
     if not spoll:
         message = msg
@@ -745,9 +881,9 @@ async def auto_filter(client, msg, spoll=False):
     if settings["button"]:
         btn = [
             [
-                # MODIFIED: बटन फ़ॉन्ट और इमोजी का उपयोग
                 InlineKeyboardButton(
-                    text=f"[{to_fancy_font(get_size(file.file_size))}] {to_fancy_font(file.file_name)}", callback_data=f'{pre}#{file.file_id}'
+                    text=f"📁 {to_fancy_font(file.file_name)}",
+                    callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
             for file in files
@@ -755,7 +891,6 @@ async def auto_filter(client, msg, spoll=False):
     else:
         btn = [
             [
-                # MODIFIED: बटन फ़ॉन्ट और इमोजी का उपयोग
                 InlineKeyboardButton(
                     text=f"📂 {to_fancy_font(file.file_name)}",
                     callback_data=f'{pre}#{file.file_id}',
@@ -768,45 +903,100 @@ async def auto_filter(client, msg, spoll=False):
             for file in files
         ]
 
-    # MODIFIED: चेतावनी संदेश हटाने के लिए नए डमी कॉलबैक (फ़ॉन्ट और इमोजी के साथ)
+    # Filter buttons row
+    btn.append([
+        InlineKeyboardButton(text="🎬 Qᴜᴀʟɪᴛʏ", callback_data="quality_dummy"),
+        InlineKeyboardButton(text="🌐 Lᴀɴɢᴜᴀɢᴇ", callback_data="language_dummy"),
+        InlineKeyboardButton(text="📺 Sᴇᴀsᴏɴ", callback_data="season_dummy")
+    ])
+    
+    # Chennai Express specific session buttons
+    chennai_sessions = []
+    for i in range(1, 51):
+        session_num = f"{i:02d}"
+        chennai_sessions.append(
+            InlineKeyboardButton(
+                text=f"S{session_num}", 
+                callback_data=f"session_{session_num}"
+            )
+        )
+    
+    # Add session buttons in rows of 5
+    for i in range(0, len(chennai_sessions), 5):
+        btn.append(chennai_sessions[i:i+5])
+    
+    # Indian language buttons
+    indian_languages = [
+        ("Hindi", "lang_hindi"),
+        ("Tamil", "lang_tamil"), 
+        ("Telugu", "lang_telugu"),
+        ("Malayalam", "lang_malayalam"),
+        ("Kannada", "lang_kannada"),
+        ("Bengali", "lang_bengali"),
+        ("Marathi", "lang_marathi"),
+        ("Gujarati", "lang_gujarati"),
+        ("Punjabi", "lang_punjabi")
+    ]
+    
+    lang_buttons = []
+    for lang_name, lang_data in indian_languages:
+        lang_buttons.append(
+            InlineKeyboardButton(
+                text=to_fancy_font(lang_name),
+                callback_data=lang_data
+            )
+        )
+    
+    # Add language buttons in rows of 3
+    for i in range(0, len(lang_buttons), 3):
+        btn.append(lang_buttons[i:i+3])
+    
+    # Send All Files button
+    btn.append([
+        InlineKeyboardButton(
+            text="🚀 Sᴇɴᴅ Aʟʟ Fɪʟᴇs", 
+            callback_data=f"sendall_{key}"
+        )
+    ])
+    
+    # Check Bot PM button
+    btn.append([
+        InlineKeyboardButton(
+            text="🔍 Cʜᴇᴄᴋ Bᴏᴛ PM", 
+            url=f"https://t.me/{temp.U_NAME}"
+        )
+    ])
+
+    # Pagination
     key = f"{message.chat.id}-{message.id}"
-    btn.append(
-        [
-            InlineKeyboardButton(text=to_fancy_font("Qᴜᴀʟɪᴛʏ"), callback_data="filter_q_dummy"),
-            InlineKeyboardButton(text=to_fancy_font("Lᴀɴɢᴜᴀɢᴇ"), callback_data="filter_l_dummy"),
-            InlineKeyboardButton(text=to_fancy_font("Sᴇᴀsᴏɴ"), callback_data="filter_s_dummy")
-        ]
-    )
-    
-    # NEW: 'Check Bot PM For File' बटन जोड़ा गया (फ़ॉन्ट और इमोजी के साथ)
-    btn.append(
-        [InlineKeyboardButton(text="👉 ᴄʜᴇᴄᴋ ʙᴏᴛ ᴘᴍ ғᴏʀ ғɪʟᴇ 👈", url=f"https://t.me/{temp.U_NAME}")]
-    )
-    
-    # MODIFIED: पेजिनेशन बटन (आपकी आवश्यकतानुसार)
-    pagination_buttons = []
+    BUTTONS[key] = search
     
     req = message.from_user.id if message.from_user else 0
-    total_pages = math.ceil(int(total_results) / 10)
-    current_page = 1 # Always 1 on initial load
-
-    if offset != "":
-        BUTTONS[key] = search
-        # Initial load, only NEXT is possible (unless offset is a specific value > 0, which it isn't here)
-        pagination_buttons.append(InlineKeyboardButton(f"🗓 ᴘᴀɢᴇs {current_page}/{total_pages}", callback_data="pages"))
-        pagination_buttons.append(InlineKeyboardButton(text="ɴᴇxᴛ »", callback_data=f"next_{req}_{key}_{offset}"))
-    else:
-        # No more pages
-        pagination_buttons.append(InlineKeyboardButton(text="🗓 ғɪʟᴇs 𝟷/𝟷", callback_data="pages"))
+    current_page = 1
+    total_pages = math.ceil(total_results / 10)
+    
+    pagination_buttons = []
+    if offset > 0:
+        pagination_buttons.append(
+            InlineKeyboardButton("⏪ Bᴀᴄᴋ", callback_data=f"next_{req}_{key}_{offset-10}")
+        )
+    
+    pagination_buttons.append(
+        InlineKeyboardButton(f"📄 {current_page}/{total_pages}", callback_data="pages")
+    )
+    
+    if offset + 10 < total_results:
+        pagination_buttons.append(
+            InlineKeyboardButton("Nᴇxᴛ ⏩", callback_data=f"next_{req}_{key}_{offset+10}")
+        )
     
     if pagination_buttons:
         btn.append(pagination_buttons)
 
-    # MODIFIED: आपकी रिक्वेस्ट के अनुसार मैसेज फॉर्मेट (Movie Found)
+    # Custom Message
     user_mention = message.from_user.mention if message.from_user else 'Usᴇʀ'
     chat_title = message.chat.title if message.chat.title else 'ᴛʜɪs ɢʀᴏᴜᴘ'
     
-    # Custom Message
     custom_msg = f"""
 **[ 📂 ʜᴇʀᴇ ɪ ғᴏᴜɴᴅ ғᴏʀ ʏᴏᴜʀ sᴇᴀʀᴄʜ >{search}<**
 
@@ -819,7 +1009,6 @@ async def auto_filter(client, msg, spoll=False):
     imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
     TEMPLATE = settings['template']
     if imdb:
-        # If IMDB is enabled, we use the IMDB template first
         cap = TEMPLATE.format(
             query=search,
             title=imdb['title'],
@@ -851,12 +1040,8 @@ async def auto_filter(client, msg, spoll=False):
             url=imdb['url'],
             **locals()
         )
-        
-        # Then append the custom movie files message
         cap += "\n\n" + custom_msg
-        
     else:
-        # If IMDB is disabled, just use the custom message
         cap = custom_msg
         
     sent_message = None
@@ -874,13 +1059,12 @@ async def auto_filter(client, msg, spoll=False):
     else:
         sent_message = await message.reply_text(cap, reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.MARKDOWN)
 
-    # NEW: ग्रुप में भेजे गए रिजल्ट को 10 मिनट (600 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
+    # Schedule deletion of result message after 10 minutes
     if sent_message:
         asyncio.create_task(schedule_delete(sent_message, 600))
         
     if spoll:
         await msg.message.delete()
-
 
 async def advantage_spell_chok(msg):
     query = re.sub(
@@ -894,7 +1078,6 @@ async def advantage_spell_chok(msg):
     
     gs_parsed = []
     if not g_s:
-        # MODIFIED: आपकी रिक्वेस्ट के अनुसार "Movie not found" का मैसेज बदला गया
         not_found_text = (
             "**षमा करें, हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌**\n\n"
             "**sᴏʀʀʏ, ᴡᴇ ʜᴀᴠᴇɴ'ᴛ ғɪɴᴅ ʏᴏᴜʀ ғɪʟᴇ. ᴍᴀʏʙᴇ ʏᴏᴜ ᴍᴀᴅᴇ ᴀ ᴍɪsᴛᴀᴋᴇ? ᴘʟᴇᴀsᴇ ᴛʀʏ ᴛᴏ ᴡʀɪᴛᴇ ᴄᴏʀʀᴇᴄᴛʟʏ 😊**\n"
@@ -902,7 +1085,6 @@ async def advantage_spell_chok(msg):
             "**sᴇᴀʀᴄʜ sᴇᴄᴏɴᴅ ʙᴏᴛ - @asfilter_bot**"
         )
         k = await msg.reply_text(not_found_text, parse_mode=enums.ParseMode.MARKDOWN)
-        # MODIFIED: संदेश को 8 सेकंड बाद हटाने के लिए शेड्यूल किया गया
         asyncio.create_task(schedule_delete(k, 8))
         return
     regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)
@@ -930,7 +1112,6 @@ async def advantage_spell_chok(msg):
     movielist += [(re.sub(r'(\-|\(|\)|_)', '', i, flags=re.IGNORECASE)).strip() for i in gs_parsed]
     movielist = list(dict.fromkeys(movielist))
     if not movielist:
-        # MODIFIED: आपकी रिक्वेस्ट के अनुसार "Movie not found" का मैसेज बदला गया
         not_found_text = (
             "**षमा करें, हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌**\n\n"
             "**sᴏʀʀʏ, ᴡᴇ ʜᴀᴠᴇɴ'ᴛ ғɪɴᴅ ʏᴏᴜʀ ғɪʟᴇ. ᴍᴀʏʙᴇ ʏᴏᴜ ᴍᴀᴅᴇ ᴀ ᴍɪsᴛᴀᴋᴇ? ᴘʟᴇᴀsᴇ ᴛʀʏ ᴛᴏ ᴡʀɪᴛᴇ ᴄᴏʀʀᴇᴄᴛʟʏ 😊**\n"
@@ -938,24 +1119,19 @@ async def advantage_spell_chok(msg):
             "**sᴇᴀʀᴄʜ sᴇᴄᴏɴᴅ ʙᴏᴛ - @asfilter_bot**"
         )
         k = await msg.reply_text(not_found_text, parse_mode=enums.ParseMode.MARKDOWN)
-        # MODIFIED: संदेश को 8 सेकंड बाद हटाने के लिए शेड्यूल किया गया
         asyncio.create_task(schedule_delete(k, 8))
         return
     SPELL_CHECK[msg.id] = movielist
     btn = [[
         InlineKeyboardButton(
-            # MODIFIED: बटन फ़ॉन्ट का उपयोग
             text=to_fancy_font(movie.strip()),
             callback_data=f"spolling#{user}#{k}",
         )
     ] for k, movie in enumerate(movielist)]
-    # MODIFIED: बटन फ़ॉन्ट का उपयोग
     btn.append([InlineKeyboardButton(text=to_fancy_font("🔐 ᴄʟᴏsᴇ"), callback_data=f'spolling#{user}#close_spellcheck')])
     spell_check_message = await msg.reply("ɪ ᴄᴏᴜʟᴅɴ'ᴛ ғɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\nᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏғ ᴛʜᴇsᴇ?",
                     reply_markup=InlineKeyboardMarkup(btn))
-    # NEW: स्पेल चेक मैसेज को 60 सेकंड बाद डिलीट करने के लिए शेड्यूल किया गया
     asyncio.create_task(schedule_delete(spell_check_message, 60))
-
 
 async def manual_filters(client, message, text=False):
     group_id = message.chat.id
@@ -976,12 +1152,9 @@ async def manual_filters(client, message, text=False):
                         if btn == "[]":
                             await client.send_message(group_id, reply_text, disable_web_page_preview=True)
                         else:
-                            # MODIFIED: बटन फ़ॉन्ट को मैनुअल फिल्टर के बटनों पर भी अप्लाई किया गया है
-                            # Note: eval(btn) will load the button structure, then we modify the text.
                             button_structure = eval(btn)
                             for row in button_structure:
                                 for button in row:
-                                    # Assuming button is an InlineKeyboardButton, modify its text
                                     if 'text' in button:
                                         button['text'] = to_fancy_font(button['text'])
                             
@@ -1001,7 +1174,6 @@ async def manual_filters(client, message, text=False):
                             reply_to_message_id=reply_id
                         )
                     else:
-                        # MODIFIED: बटन फ़ॉन्ट को मैनुअल फिल्टर के बटनों पर भी अप्लाई किया गया है
                         button_structure = eval(btn)
                         for row in button_structure:
                             for button in row:
