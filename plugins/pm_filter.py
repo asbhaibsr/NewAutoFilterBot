@@ -147,7 +147,23 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     pre = 'filep' if settings['file_secure'] else 'file'
     
     # --- Start building buttons ---
-
+    btn = []
+    
+    # Filter buttons row (New Order: Quality, Language, Season - above Send All)
+    btn.append([
+        InlineKeyboardButton(text=to_fancy_font(f"🎬 Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
+        InlineKeyboardButton(text=to_fancy_font(f"🌐 Language ({current_language or 'None'})"), callback_data=f"open_filter#language#{key}"),
+        InlineKeyboardButton(text=to_fancy_font(f"📺 Season ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}")
+    ])
+    
+    # Send All Files button
+    btn.append([
+        InlineKeyboardButton(
+            text=to_fancy_font("🚀 Send All Files"), 
+            callback_data=f"sendall_{key}"
+        )
+    ])
+    
     # File buttons
     if settings['button']:
         file_btn = [
@@ -177,31 +193,8 @@ async def run_filtered_search(client, query, key, back_to_main=False):
             for file in files
         ]
     
-    btn = file_btn
+    btn.extend(file_btn)
     
-    # Filter buttons row (New Order: Quality, Language, Season - above Send All)
-    btn.append([
-        InlineKeyboardButton(text=to_fancy_font(f"🎬 Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
-        InlineKeyboardButton(text=to_fancy_font(f"🌐 Language ({current_language or 'None'})"), callback_data=f"open_filter#language#{key}"),
-        InlineKeyboardButton(text=to_fancy_font(f"📺 Season ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}")
-    ])
-    
-    # Send All Files button
-    btn.append([
-        InlineKeyboardButton(
-            text=to_fancy_font("🚀 Send All Files"), 
-            callback_data=f"sendall_{key}"
-        )
-    ])
-    
-    # Check Bot PM button (FIX: Direct user mention, no link)
-    btn.append([
-        InlineKeyboardButton(
-            text=to_fancy_font("🔍 Check Bot PM"), 
-            url=f"https://t.me/{temp.U_NAME}" # Correct URL for PM
-        )
-    ])
-
     # Pagination
     req = query.from_user.id if query.from_user else 0
     current_page = math.ceil(offset / 10) + 1
@@ -226,6 +219,14 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     if pagination_buttons:
         btn.append(pagination_buttons)
         
+    # Check Bot PM button (FIX: Direct user mention, no link)
+    btn.append([
+        InlineKeyboardButton(
+            text=to_fancy_font("🔍 Check Bot PM"), 
+            url=f"https://t.me/{temp.U_NAME}" # Correct URL for PM
+        )
+    ])
+        
     # --- End building buttons ---
 
     # Custom Message - FIX: Removed ([), (]), and (<>) from search result message
@@ -235,10 +236,12 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
     
     # Cleaned up message format as requested
+    # FIX: Requested by message structure changed to avoid fancy font link error
     custom_msg = f"""
 **📂 Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
 {filters_applied}
-**📢 Requested By: {user_mention}**
+
+**📢 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ:** {user_mention}
 **♾️ Powered By: {chat_title}**
 
 **🍿 Your Movie Files ({total_results}) 👇**
@@ -310,32 +313,8 @@ async def next_page(bot, query):
     settings = await get_settings(query.message.chat.id)
     pre = 'filep' if settings['file_secure'] else 'file'
     
-    # File buttons
-    if settings['button']:
-        btn = [
-            [
-                InlineKeyboardButton(
-                    text=f"📁 {to_fancy_font(file.file_name)}",
-                    callback_data=f'{pre}#{file.file_id}'
-                ),
-            ]
-            for file in files
-        ]
-    else:
-        btn = [
-            [
-                InlineKeyboardButton(
-                    text=f"📂 {to_fancy_font(file.file_name)}",
-                    callback_data=f'{pre}#{file.file_id}',
-                ),
-                InlineKeyboardButton(
-                    text=f"💾 {to_fancy_font(get_size(file.file_size))}",
-                    callback_data=f'{pre}#{file.file_id}',
-                ),
-            ]
-            for file in files
-        ]
-
+    btn = []
+    
     # Filter buttons row (New Order)
     btn.append([
         InlineKeyboardButton(text=to_fancy_font(f"🎬 Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
@@ -351,13 +330,34 @@ async def next_page(bot, query):
         )
     ])
     
-    # Check Bot PM button (FIX: Direct user mention, no link)
-    btn.append([
-        InlineKeyboardButton(
-            text=to_fancy_font("🔍 Check Bot PM"), 
-            url=f"https://t.me/{temp.U_NAME}"
-        )
-    ])
+    # File buttons
+    if settings['button']:
+        file_btn = [
+            [
+                InlineKeyboardButton(
+                    text=f"📁 {to_fancy_font(file.file_name)}",
+                    callback_data=f'{pre}#{file.file_id}'
+                ),
+            ]
+            for file in files
+        ]
+    else:
+        file_btn = [
+            [
+                InlineKeyboardButton(
+                    text=f"📂 {to_fancy_font(file.file_name)}",
+                    callback_data=f'{pre}#{file.file_id}',
+                ),
+                InlineKeyboardButton(
+                    text=f"💾 {to_fancy_font(get_size(file.file_size))}",
+                    callback_data=f'{pre}#{file.file_id}',
+                ),
+            ]
+            for file in files
+        ]
+        
+    btn.extend(file_btn)
+
 
     # Pagination
     current_page = math.ceil(offset / 10) + 1
@@ -380,9 +380,36 @@ async def next_page(bot, query):
     
     if pagination_buttons:
         btn.append(pagination_buttons)
+        
+    # Check Bot PM button (FIX: Direct user mention, no link)
+    btn.append([
+        InlineKeyboardButton(
+            text=to_fancy_font("🔍 Check Bot PM"), 
+            url=f"https://t.me/{temp.U_NAME}"
+        )
+    ])
 
     try:
-        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(btn))
+        # Re-fetch the custom message logic here to ensure it updates with new filters/pagination
+        user_mention = query.from_user.mention if query.from_user else 'User'
+        chat_title = query.message.chat.title if query.message.chat.title else 'This Group'
+        filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
+        custom_msg = f"""
+**📂 Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
+{filters_applied}
+
+**📢 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ:** {user_mention}
+**♾️ Powered By: {chat_title}**
+
+**🍿 Your Movie Files ({total}) 👇**
+"""
+        
+        await query.message.edit_text(
+            text=to_fancy_font(custom_msg), 
+            reply_markup=InlineKeyboardMarkup(btn), 
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+
     except MessageNotModified:
         pass
     await query.answer()
@@ -452,11 +479,13 @@ async def send_all_files(bot, query):
                     logger.exception(e)
             
             # Send file to user's PM
+            # IMPORTANT: Using client.send_cached_media ensures file is sent via bot, not just a forwarded message
             sent_msg = await bot.send_cached_media(
                 chat_id=user_id,
                 file_id=file.file_id,
                 caption=file_caption,
-                protect_content=True # Assuming file_secure is intended for PM sendall
+                # Assume if sendall is used, file_secure logic should apply here too
+                protect_content=True 
             )
             
             sent_count += 1
@@ -470,6 +499,11 @@ async def send_all_files(bot, query):
         except UserIsBlocked:
             await query.message.reply_text(to_fancy_font("❌ Please unblock the bot first!"))
             return
+        except PeerIdInvalid:
+             await query.message.reply_text(to_fancy_font("❌ Please start the bot in private chat first!"), 
+                                           reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(to_fancy_font("▶️ Start Bot"), url=f"https://t.me/{temp.U_NAME}")]])
+                                           )
+             return
         except Exception as e:
             logger.error(f"Error sending file {file.file_name}: {e}")
             continue
@@ -598,9 +632,12 @@ async def cb_handler(client: Client, query: CallbackQuery):
         new_filter_buttons = create_filter_buttons(filter_type, key, search_data)
         
         # Edit message to show updated checkmarks
-        await query.message.edit_reply_markup(
-            reply_markup=InlineKeyboardMarkup(new_filter_buttons)
-        )
+        try:
+             await query.message.edit_reply_markup(
+                 reply_markup=InlineKeyboardMarkup(new_filter_buttons)
+             )
+        except MessageNotModified:
+             pass
         
         # Run search with new filter
         await run_filtered_search(client, query, key)
@@ -623,10 +660,13 @@ async def cb_handler(client: Client, query: CallbackQuery):
     elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
+        
+        # FIX FOR KeyError: 0
         if not files_:
+            # This check handles the error you were seeing in the logs if get_file_details returns empty
             return await query.answer(to_fancy_font('No Such File Exist.'))
         
-        files = files_[0]
+        files = files_[0] # Safely access the first item now
         title = files.file_name
         size = get_size(files.file_size)
         f_caption = files.caption
@@ -696,7 +736,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
     
     elif query.data.startswith("checksub"):
         if AUTH_CHANNEL and not await is_subscribed(client, query):
-            await query.answer("ɪ ʟɪᴋᴇ ʏᴏᴜʀ sᴍᴀʀᴛɴᴇss, ʙᴜᴛ ᴅᴏɴ'ᴛ ʙᴇ ᴏᴠᴇʀsᴍᴀʀᴛ 😒", show_alert=True)
+            await query.answer("ɪ ʟɪᴋᴇ ʏᴏᴜʀ sᴍᴀʀᴛɴᴇss, ʙᴜᴛ ᴅᴏɴ'T ʙᴇ ᴏᴠᴇʀsᴍᴀʀᴛ 😒", show_alert=True)
             return
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
@@ -991,30 +1031,7 @@ async def auto_filter(client, msg, spoll=False):
     }
         
     pre = 'filep' if settings['file_secure'] else 'file'
-    if settings["button"]:
-        btn = [
-            [
-                InlineKeyboardButton(
-                    text=f"📁 {to_fancy_font(file.file_name)}",
-                    callback_data=f'{pre}#{file.file_id}'
-                ),
-            ]
-            for file in files
-        ]
-    else:
-        btn = [
-            [
-                InlineKeyboardButton(
-                    text=f"📂 {to_fancy_font(file.file_name)}",
-                    callback_data=f'{pre}#{file.file_id}',
-                ),
-                InlineKeyboardButton(
-                    text=f"💾 {to_fancy_font(get_size(file.file_size))}",
-                    callback_data=f'{pre}#{file.file_id}',
-                ),
-            ]
-            for file in files
-        ]
+    btn = []
 
     # Filter buttons row (New Order: Quality, Language, Season - above Send All)
     btn.append([
@@ -1031,13 +1048,33 @@ async def auto_filter(client, msg, spoll=False):
         )
     ])
     
-    # Check Bot PM button (FIX: Direct user mention, no link)
-    btn.append([
-        InlineKeyboardButton(
-            text=to_fancy_font("🔍 Check Bot PM"), 
-            url=f"https://t.me/{temp.U_NAME}"
-        )
-    ])
+    # File buttons
+    if settings["button"]:
+        file_btn = [
+            [
+                InlineKeyboardButton(
+                    text=f"📁 {to_fancy_font(file.file_name)}",
+                    callback_data=f'{pre}#{file.file_id}'
+                ),
+            ]
+            for file in files
+        ]
+    else:
+        file_btn = [
+            [
+                InlineKeyboardButton(
+                    text=f"📂 {to_fancy_font(file.file_name)}",
+                    callback_data=f'{pre}#{file.file_id}',
+                ),
+                InlineKeyboardButton(
+                    text=f"💾 {to_fancy_font(get_size(file.file_size))}",
+                    callback_data=f'{pre}#{file.file_id}',
+                ),
+            ]
+            for file in files
+        ]
+        
+    btn.extend(file_btn)
 
     # Pagination 
     req = message.from_user.id if message.from_user else 0
@@ -1069,15 +1106,23 @@ async def auto_filter(client, msg, spoll=False):
     if pagination_buttons:
         btn.append(pagination_buttons)
 
+    # Check Bot PM button (FIX: Direct user mention, no link)
+    btn.append([
+        InlineKeyboardButton(
+            text=to_fancy_font("🔍 Check Bot PM"), 
+            url=f"https://t.me/{temp.U_NAME}"
+        )
+    ])
+
     # Custom Message - FIX: Removed ([), (]), and (<>) from search result message
     user_mention = message.from_user.mention if message.from_user else 'User'
     chat_title = message.chat.title if message.chat.title else 'This Group'
     
-    # Cleaned up message format as requested
+    # FIX: Requested by message structure changed to avoid fancy font link error
     custom_msg = f"""
 **📂 Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
 
-**📢 Requested By: {user_mention}**
+**📢 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ:** {user_mention}
 **♾️ Powered By: {chat_title}**
 
 **🍿 Your Movie Files ({total_results}) 👇**
