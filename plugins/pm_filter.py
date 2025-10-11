@@ -154,7 +154,7 @@ async def next_page(bot, query):
     for i in range(0, len(lang_buttons), 3):
         btn.append(lang_buttons[i:i+3])
     
-    # Send All Files button - FIXED: key variable is now properly defined
+    # Send All Files button
     btn.append([
         InlineKeyboardButton(
             text="🚀 Sᴇɴᴅ Aʟʟ Fɪʟᴇs", 
@@ -971,24 +971,27 @@ async def auto_filter(client, msg, spoll=False):
         )
     ])
 
-    # Pagination
+    # Pagination - FIXED: Convert offset to integer before comparison
     req = message.from_user.id if message.from_user else 0
     current_page = 1
     total_pages = math.ceil(total_results / 10)
     
     pagination_buttons = []
-    if offset > 0:
+    
+    # FIX: Convert offset to integer before comparison
+    if int(offset) > 0:
         pagination_buttons.append(
-            InlineKeyboardButton("⏪ Bᴀᴄᴋ", callback_data=f"next_{req}_{key}_{offset-10}")
+            InlineKeyboardButton("⏪ Bᴀᴄᴋ", callback_data=f"next_{req}_{key}_{int(offset)-10}")
         )
     
     pagination_buttons.append(
         InlineKeyboardButton(f"📄 {current_page}/{total_pages}", callback_data="pages")
     )
     
-    if offset + 10 < total_results:
+    # FIX: Convert offset to integer before comparison
+    if int(offset) + 10 < total_results:
         pagination_buttons.append(
-            InlineKeyboardButton("Nᴇxᴛ ⏩", callback_data=f"next_{req}_{key}_{offset+10}")
+            InlineKeyboardButton("Nᴇxᴛ ⏩", callback_data=f"next_{req}_{key}_{int(offset)+10}")
         )
     
     if pagination_buttons:
@@ -1130,7 +1133,7 @@ async def advantage_spell_chok(msg):
         )
     ] for k, movie in enumerate(movielist)]
     btn.append([InlineKeyboardButton(text=to_fancy_font("🔐 ᴄʟᴏsᴇ"), callback_data=f'spolling#{user}#close_spellcheck')])
-    spell_check_message = await msg.reply("ɪ ᴄᴏᴜʟᴅɴ'ᴛ ғɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\nᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏғ ᴛʜᴇsᴇ?",
+    spell_check_message = await msg.reply("ɪ ᴄᴏᴜʟᴅɴ'ᴛ ғɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴅ ᴛᴏ ᴛʜᴀᴛ\nᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏғ ᴛʜᴇsᴇ?",
                     reply_markup=InlineKeyboardMarkup(btn))
     asyncio.create_task(schedule_delete(spell_check_message, 60))
 
