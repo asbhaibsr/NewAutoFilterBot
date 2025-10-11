@@ -19,14 +19,13 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 
-# BUTTONS will now store the search state including filters
 BUTTONS = {}
 SPELL_CHECK = {}
 
-# Filter Options Definitions
 QUALITY_OPTIONS = [
-    ("4K", "4K"), ("2K", "2K"), ("1080p", "1080p"), 
-    ("720p", "720p"), ("480p", "480p"), ("BluRay", "BluRay"),
+    ("360P", "360P"), ("480P", "480P"), ("720P", "720P"), 
+    ("1080P", "1080P"), ("1440P", "1440P"), ("2160P", "2160P"),
+    ("4K", "4K"), ("2K", "2K"), ("BluRay", "BluRay"),
     ("HD Rip", "HD Rip"), ("Web-DL", "Web-DL"), ("HDRip", "HDRip")
 ]
 
@@ -38,12 +37,10 @@ INDIAN_LANGUAGES = [
     ("Punjabi", "Punjabi"), ("English", "English")
 ]
 
-# Season options
-SEASON_OPTIONS = [f"S{i:02d}" for i in range(1, 51)] 
+SEASON_OPTIONS = [f"Season {i}" for i in range(1, 51)]
 
-# Enhanced fancy font converter - Clean version without emojis
 def to_fancy_font(text):
-    """Converts text to fancy font style, avoiding emojis for clean buttons"""
+    """Converts text to fancy font style"""
     mapping = {
         'A': 'ᴀ', 'B': 'ʙ', 'C': 'ᴄ', 'D': 'ᴅ', 'E': 'ᴇ', 'F': 'ꜰ', 'G': 'ɢ', 'H': 'ʜ', 'I': 'ɪ', 'J': 'ᴊ', 
         'K': 'ᴋ', 'L': 'ʟ', 'M': 'ᴍ', 'N': 'ɴ', 'O': 'ᴏ', 'P': 'ᴘ', 'Q': 'ǫ', 'R': 'ʀ', 'S': 's', 'T': 'ᴛ', 
@@ -60,7 +57,6 @@ def to_fancy_font(text):
     return ''.join(mapping.get(char, char) for char in text)
 
 async def schedule_delete(message, delay_seconds):
-    """Delete message after specified delay"""
     await asyncio.sleep(delay_seconds)
     try:
         if message and hasattr(message, 'id') and message.id:
@@ -68,35 +64,26 @@ async def schedule_delete(message, delay_seconds):
     except Exception as e:
         logger.warning(f"Error deleting message: {e}")
 
-# NEW FUNCTION: Creates the filter option buttons
 def create_filter_buttons(filter_type, key, current_state=None):
-    """Creates a list of InlineKeyboardButtons for the given filter type."""
     buttons = []
-    
-    # Back button to return to the main file list
-    back_button = [InlineKeyboardButton(text=to_fancy_font("Back To Files"), callback_data=f"back_to_files#{key}")]
     
     if filter_type == "quality":
         options = QUALITY_OPTIONS
         current_selection = current_state.get('quality') if current_state else None
-        
     elif filter_type == "language":
         options = INDIAN_LANGUAGES
         current_selection = current_state.get('language') if current_state else None
-
     elif filter_type == "season":
         options = [(s, s) for s in SEASON_OPTIONS]
         current_selection = current_state.get('season') if current_state else None
     else:
-        return back_button
+        return [InlineKeyboardButton(text=to_fancy_font("Back To Files"), callback_data=f"back_to_files#{key}")]
 
-    # Create buttons in rows of 3 or 5
-    items_per_row = 3 if filter_type in ["quality", "language"] else 5
+    items_per_row = 3 if filter_type in ["quality", "language"] else 2
     
     for i in range(0, len(options), items_per_row):
         row = []
         for name, data in options[i:i+items_per_row]:
-            # Add a checkmark if this is the currently selected option
             text = f"✅ {name}" if current_selection == data else name
             row.append(
                 InlineKeyboardButton(
@@ -106,17 +93,14 @@ def create_filter_buttons(filter_type, key, current_state=None):
             )
         buttons.append(row)
         
-    buttons.append(back_button)
+    buttons.append([InlineKeyboardButton(text=to_fancy_font("Back To Files"), callback_data=f"back_to_files#{key}")])
     return buttons
 
-# NEW FUNCTION: Runs the search based on the current state in BUTTONS
 async def run_filtered_search(client, query, key, back_to_main=False):
-    """Re-runs the search with current filters and updates the message."""
     search_data = BUTTONS.get(key)
     if not search_data:
         return await query.message.edit_text("Search expired. Please search again.")
 
-    # Reset offset for a new search if filters were just changed
     offset = 0 if not back_to_main else search_data.get('offset', 0)
     
     search = search_data['search']
@@ -124,7 +108,6 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     current_quality = search_data['quality']
     current_season = search_data['season']
 
-    # Get new search results with filters
     files, n_offset, total_results = await get_search_results(
         search, 
         offset=offset, 
@@ -134,7 +117,6 @@ async def run_filtered_search(client, query, key, back_to_main=False):
         season=current_season
     )
 
-    # Update search_data in the global dictionary
     search_data['offset'] = n_offset
     search_data['total_results'] = total_results
     BUTTONS[key] = search_data
@@ -142,45 +124,38 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     settings = await get_settings(query.message.chat.id)
     pre = 'filep' if settings['file_secure'] else 'file'
     
-    # --- Start building buttons ---
     btn = []
     
-    # File buttons FIRST (files will be at top)
+    # File buttons with regular font
     if settings['button']:
-        file_btn = [
-            [
+        for file in files:
+            btn.append([
                 InlineKeyboardButton(
-                    text=f"{file.file_name}",  # Regular font for file names
+                    text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}'
-                ),
-            ]
-            for file in files
-        ]
+                )
+            ])
     else:
-        file_btn = [
-            [
+        for file in files:
+            btn.append([
                 InlineKeyboardButton(
-                    text=f"{file.file_name}",  # Regular font for file names
+                    text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}',
                 ),
                 InlineKeyboardButton(
                     text=f"{get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}',
-                ),
-            ]
-            for file in files
-        ]
+                )
+            ])
     
-    btn.extend(file_btn)
-    
-    # Filter buttons at BOTTOM (as requested)
+    # Filter buttons row
     btn.append([
         InlineKeyboardButton(text=to_fancy_font(f"Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
         InlineKeyboardButton(text=to_fancy_font(f"Language ({current_language or 'None'})"), callback_data=f"open_filter#language#{key}")
     ])
     
     btn.append([
-        InlineKeyboardButton(text=to_fancy_font(f"Session ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}"),
+        InlineKeyboardButton(text=to_fancy_font(f"Season ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}"),
         InlineKeyboardButton(text=to_fancy_font("Send All Files"), callback_data=f"sendall_{key}")
     ])
     
@@ -189,44 +164,33 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     current_page = math.ceil(offset / 10) + 1
     total_pages = math.ceil(total_results / 10)
     
-    pagination_buttons = []
-    
     if offset > 0:
-        pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}")
-        )
-    
-    pagination_buttons.append(
-        InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages")
-    )
-    
-    if n_offset != 0 and n_offset < total_results:
-        pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}")
-        )
-    
-    if pagination_buttons:
-        btn.append(pagination_buttons)
+        btn.append([
+            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}"),
+            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
+            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}") if n_offset != 0 and n_offset < total_results else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
+        ])
+    else:
+        btn.append([
+            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
+            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}") if n_offset != 0 and n_offset < total_results else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
+        ])
         
-    # Check Bot PM button
     btn.append([
         InlineKeyboardButton(
             text=to_fancy_font("Check Bot PM"), 
             url=f"https://t.me/{temp.U_NAME}"
         )
     ])
-        
-    # --- End building buttons ---
 
-    # Custom Message - FIXED: No fancy font for user mention
+    # FIXED: User mention without fancy font
     user_mention = query.from_user.mention if query.from_user else 'User'
     chat_title = query.message.chat.title if query.message.chat.title else 'This Group'
     
     filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
     
-    # FIXED: Clean message without fancy font for user mention
     custom_msg = f"""
-**Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
+**Here I Found For Your Search: {search}**
 {filters_applied}
 
 **Requested By:** {user_mention}
@@ -244,7 +208,7 @@ async def run_filtered_search(client, query, key, back_to_main=False):
     except MessageNotModified:
         pass
     except Exception as e:
-        logger.error(f"Error editing message in run_filtered_search: {e}")
+        logger.error(f"Error editing message: {e}")
 
 @Client.on_message(filters.group & filters.text & filters.incoming)
 async def give_filter(client, message):
@@ -260,7 +224,7 @@ async def next_page(bot, query):
         
     try:
         offset = int(offset)
-    except ValueError:
+    except:
         offset = 0
     
     search_data = BUTTONS.get(key)
@@ -283,12 +247,11 @@ async def next_page(bot, query):
     )
     
     try:
-        n_offset = int(n_offset) if n_offset else 0
-    except ValueError:
+        n_offset = int(n_offset)
+    except:
         n_offset = 0
 
     if not files:
-        await query.answer("No more results.", show_alert=True)
         return
         
     search_data['offset'] = n_offset
@@ -300,68 +263,52 @@ async def next_page(bot, query):
     
     btn = []
     
-    # File buttons FIRST
     if settings['button']:
-        file_btn = [
-            [
+        for file in files:
+            btn.append([
                 InlineKeyboardButton(
                     text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}'
-                ),
-            ]
-            for file in files
-        ]
+                )
+            ])
     else:
-        file_btn = [
-            [
+        for file in files:
+            btn.append([
                 InlineKeyboardButton(
                     text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}',
                 ),
                 InlineKeyboardButton(
                     text=f"{get_size(file.file_size)}",
-                    callback_data=f'{pre}#{file.file_id}',
-                ),
-            ]
-            for file in files
-        ]
-        
-    btn.extend(file_btn)
+                    callback_data=f'{pre}#{file.file_size}',
+                )
+            ])
 
-    # Filter buttons at BOTTOM
     btn.append([
         InlineKeyboardButton(text=to_fancy_font(f"Quality ({current_quality or 'None'})"), callback_data=f"open_filter#quality#{key}"),
         InlineKeyboardButton(text=to_fancy_font(f"Language ({current_language or 'None'})"), callback_data=f"open_filter#language#{key}")
     ])
     
     btn.append([
-        InlineKeyboardButton(text=to_fancy_font(f"Session ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}"),
+        InlineKeyboardButton(text=to_fancy_font(f"Season ({current_season or 'None'})"), callback_data=f"open_filter#season#{key}"),
         InlineKeyboardButton(text=to_fancy_font("Send All Files"), callback_data=f"sendall_{key}")
     ])
 
-    # Pagination
     current_page = math.ceil(offset / 10) + 1
     total_pages = math.ceil(total / 10)
     
-    pagination_buttons = []
     if offset > 0:
-        pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}")
-        )
-    
-    pagination_buttons.append(
-        InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages")
-    )
-    
-    if n_offset != 0 and n_offset < total:
-        pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}")
-        )
-    
-    if pagination_buttons:
-        btn.append(pagination_buttons)
+        btn.append([
+            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{offset-10}"),
+            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
+            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}") if n_offset != 0 and n_offset < total else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
+        ])
+    else:
+        btn.append([
+            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
+            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{n_offset}") if n_offset != 0 and n_offset < total else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
+        ])
         
-    # Check Bot PM button
     btn.append([
         InlineKeyboardButton(
             text=to_fancy_font("Check Bot PM"), 
@@ -369,12 +316,12 @@ async def next_page(bot, query):
         )
     ])
 
-    try:
-        user_mention = query.from_user.mention if query.from_user else 'User'
-        chat_title = query.message.chat.title if query.message.chat.title else 'This Group'
-        filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
-        custom_msg = f"""
-**Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
+    user_mention = query.from_user.mention if query.from_user else 'User'
+    chat_title = query.message.chat.title if query.message.chat.title else 'This Group'
+    filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
+    
+    custom_msg = f"""
+**Here I Found For Your Search: {search}**
 {filters_applied}
 
 **Requested By:** {user_mention}
@@ -383,19 +330,15 @@ async def next_page(bot, query):
 **Your Movie Files ({total})**
 """
         
-        await query.message.edit_text(
-            text=custom_msg,
-            reply_markup=InlineKeyboardMarkup(btn), 
-            parse_mode=enums.ParseMode.MARKDOWN
-        )
-
-    except MessageNotModified:
-        pass
+    await query.message.edit_text(
+        text=custom_msg,
+        reply_markup=InlineKeyboardMarkup(btn), 
+        parse_mode=enums.ParseMode.MARKDOWN
+    )
     await query.answer()
 
 @Client.on_callback_query(filters.regex(r"^sendall"))
 async def send_all_files(bot, query):
-    """Send all files to PM at once"""
     _, key = query.data.split("_")
     
     search_data = BUTTONS.get(key)
@@ -410,10 +353,8 @@ async def send_all_files(bot, query):
     current_quality = search_data['quality']
     current_season = search_data['season']
     
-    # Get all files for this search
     all_files = []
     offset = 0
-    max_total_files = 1000
     while True:
         files, next_offset, total = await get_search_results(
             search, 
@@ -428,10 +369,10 @@ async def send_all_files(bot, query):
         
         try:
             next_offset = int(next_offset)
-        except (TypeError, ValueError):
+        except:
             next_offset = 0
 
-        if next_offset == 0 or len(all_files) >= max_total_files:
+        if next_offset == 0 or len(all_files) >= 1000:
             break
         offset = next_offset
     
@@ -443,7 +384,6 @@ async def send_all_files(bot, query):
     user_id = query.from_user.id
     sent_count = 0
     
-    # Send files to user's PM
     for file in all_files:
         try:
             file_caption = file.caption or f"{file.file_name}"
@@ -457,7 +397,6 @@ async def send_all_files(bot, query):
                 except Exception as e:
                     logger.exception(e)
             
-            # Send file to user's PM
             sent_msg = await bot.send_cached_media(
                 chat_id=user_id,
                 file_id=file.file_id,
@@ -465,7 +404,6 @@ async def send_all_files(bot, query):
                 protect_content=True 
             )
             
-            # FIXED: Add warning message for each file
             warning_message = f"""
 **ʜᴇʟʟᴏ** {query.from_user.mention},
 
@@ -480,10 +418,7 @@ async def send_all_files(bot, query):
             await sent_msg.reply_text(warning_message, quote=True)
             sent_count += 1
             
-            # Schedule deletion after 5 minutes
             asyncio.create_task(schedule_delete(sent_msg, 300))
-            
-            # Small delay to avoid flooding
             await asyncio.sleep(0.5)
             
         except UserIsBlocked:
@@ -498,7 +433,6 @@ async def send_all_files(bot, query):
             logger.error(f"Error sending file {file.file_name}: {e}")
             continue
     
-    # Notification
     filters_applied = f"**Filters:** Q: `{current_quality or 'None'}`, L: `{current_language or 'None'}`, S: `{current_season or 'None'}`"
     notification = await query.message.reply_text(
         f"✅ Successfully sent {sent_count} files to your PM!\n"
@@ -536,7 +470,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
     if query.data == "close_data":
         await query.message.delete()
     
-    # --- NEW FILTER HANDLERS ---
     elif query.data.startswith("open_filter#"):
         await query.answer()
         _, filter_type, key = query.data.split("#")
@@ -546,7 +479,18 @@ async def cb_handler(client: Client, query: CallbackQuery):
             return await query.message.edit_text("Search expired. Please search again.")
 
         filter_buttons = create_filter_buttons(filter_type, key, search_data)
-        await query.message.edit_reply_markup(
+        
+        if filter_type == "quality":
+            title = "SELECT QUALITY ↓"
+        elif filter_type == "language":
+            title = "SELECT LANGUAGE ↓"  
+        elif filter_type == "season":
+            title = "SELECT SEASON ↓"
+        else:
+            title = "Select Filter"
+            
+        await query.message.edit_text(
+            text=title,
             reply_markup=InlineKeyboardMarkup(filter_buttons)
         )
 
@@ -562,7 +506,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
 
         current_selection = search_data.get(filter_type)
         
-        # Toggle logic
         temp_search = search_data['search']
         temp_lang = search_data['language']
         temp_quality = search_data['quality']
@@ -592,13 +535,10 @@ async def cb_handler(client: Client, query: CallbackQuery):
              new_value = filter_value
              alert_msg = f"✅ {filter_type.capitalize()} set to {filter_value}"
         
-        # Update the state
         search_data[filter_type] = new_value
         BUTTONS[key] = search_data
 
         await query.answer(alert_msg, show_alert=False)
-        
-        # FIXED: Automatically go back to files after selection
         await run_filtered_search(client, query, key)
 
     elif query.data.startswith("back_to_files#"):
@@ -606,19 +546,20 @@ async def cb_handler(client: Client, query: CallbackQuery):
         await query.answer()
         await run_filtered_search(client, query, key, back_to_main=True)
     
-    # PM ISSUE FIX & File Sent Message Logic
+    # FIXED: Individual file sending issue
     elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
-        files_ = await get_file_details(file_id)
         
-        # FIXED: Better error handling for file details
-        if not files_:
-            return await query.answer('No Such File Exist.', show_alert=True)
-        
+        # FIX: Better file details fetching
         try:
+            files_ = await get_file_details(file_id)
+            if not files_:
+                return await query.answer('File not found in database.', show_alert=True)
+            
             files = files_[0]
-        except (IndexError, KeyError):
-            return await query.answer('File details not found.', show_alert=True)
+        except Exception as e:
+            logger.error(f"Error getting file details: {e}")
+            return await query.answer('Error fetching file details.', show_alert=True)
             
         title = files.file_name
         size = get_size(files.file_size)
@@ -632,16 +573,16 @@ async def cb_handler(client: Client, query: CallbackQuery):
                                                        file_caption='' if f_caption is None else f_caption)
             except Exception as e:
                 logger.exception(e)
-            f_caption = f_caption
+                f_caption = f_caption
         if f_caption is None:
-            f_caption = f"{files.file_name}"
+            f_caption = f"{title}"
 
         # Force Sub/Bot PM Check
         if (AUTH_CHANNEL and not await is_subscribed(client, query)) or settings['botpm']:
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
             return
         
-        # FIXED: Try sending the file to PM with better error handling
+        # FIXED: Individual file sending with proper error handling
         try:
             sent_msg = await client.send_cached_media(
                 chat_id=query.from_user.id,
@@ -650,7 +591,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 protect_content=True if ident == "filep" else False 
             )
             
-            # FIXED: Warning message for individual files
             warning_message = f"""
 **ʜᴇʟʟᴏ** {query.from_user.mention},
 
@@ -673,10 +613,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
             await query.answer("Please start the bot in private chat first!", url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}", show_alert=True)
         except Exception as e:
             logger.exception(f"Error sending file to PM: {e}")
-            await query.answer("An error occurred while sending the file. Please try again later or contact admin.", show_alert=True)
+            await query.answer("An error occurred. Please try again.", show_alert=True)
 
-    # ... (rest of the cb_handler remains similar for other commands)
-    
     elif query.data.startswith("checksub"):
         if AUTH_CHANNEL and not await is_subscribed(client, query):
             await query.answer("ɪ ʟɪᴋᴇ ʏᴏᴜʀ sᴍᴀʀᴛɴᴇss, ʙᴜᴛ ᴅᴏɴ'T ʙᴇ ᴏᴠᴇʀsᴍᴀʀᴛ 😒", show_alert=True)
@@ -708,7 +646,28 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
         asyncio.create_task(schedule_delete(sent_msg, 300))
 
-    # ... (other callback handlers remain the same)
+    elif query.data == "pages":
+        await query.answer()
+        
+    elif query.data == "start":
+        buttons = [[
+            InlineKeyboardButton(to_fancy_font('Add Me To Your Groups'), url=f'http://t.me/{temp.U_NAME}?startgroup=true')
+        ], [
+            InlineKeyboardButton(to_fancy_font('Search'), switch_inline_query_current_chat=''),
+            InlineKeyboardButton(to_fancy_font('Updates'), url='https://t.me/asbhai_bsr')
+        ], [
+            InlineKeyboardButton(to_fancy_font('Help'), callback_data='help'),
+            InlineKeyboardButton(to_fancy_font('About'), callback_data='about')
+        ]]
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await query.message.edit_text(
+            text=script.START_TXT.format(query.from_user.mention, temp.U_NAME, temp.B_NAME),
+            reply_markup=reply_markup,
+            parse_mode=enums.ParseMode.HTML
+        )
+        await query.answer('Piracy Is Crime')
+
+    # ... (other handlers remain same)
 
 async def auto_filter(client, msg, spoll=False):
     if not spoll:
@@ -727,7 +686,6 @@ async def auto_filter(client, msg, spoll=False):
                 if settings["spell_check"]:
                     return await advantage_spell_chok(msg)
                 else:
-                    # FIXED: Spell check message will now show properly
                     not_found_text = (
                         "**षमा करें, हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌**\n\n"
                         "**Sorry, we haven't find your file. Maybe you made a mistake? Please try to write correctly 😊**\n"
@@ -744,7 +702,6 @@ async def auto_filter(client, msg, spoll=False):
         settings = await get_settings(message.chat.id)
         search, files, offset, total_results = spoll
     
-    # Store search and initial empty filter state
     key = f"{message.chat.id}-{message.id}"
     BUTTONS[key] = {
         'search': search, 
@@ -758,20 +715,17 @@ async def auto_filter(client, msg, spoll=False):
     pre = 'filep' if settings['file_secure'] else 'file'
     btn = []
 
-    # File buttons FIRST
     if settings["button"]:
-        file_btn = [
-            [
+        for file in files:
+            btn.append([
                 InlineKeyboardButton(
                     text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}'
-                ),
-            ]
-            for file in files
-        ]
+                )
+            ])
     else:
-        file_btn = [
-            [
+        for file in files:
+            btn.append([
                 InlineKeyboardButton(
                     text=f"{file.file_name}",
                     callback_data=f'{pre}#{file.file_id}',
@@ -779,55 +733,41 @@ async def auto_filter(client, msg, spoll=False):
                 InlineKeyboardButton(
                     text=f"{get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}',
-                ),
-            ]
-            for file in files
-        ]
-        
-    btn.extend(file_btn)
+                )
+            ])
 
-    # Filter buttons at BOTTOM
     btn.append([
         InlineKeyboardButton(text=to_fancy_font("Quality"), callback_data=f"open_filter#quality#{key}"),
         InlineKeyboardButton(text=to_fancy_font("Language"), callback_data=f"open_filter#language#{key}")
     ])
     
     btn.append([
-        InlineKeyboardButton(text=to_fancy_font("Session"), callback_data=f"open_filter#season#{key}"),
+        InlineKeyboardButton(text=to_fancy_font("Season"), callback_data=f"open_filter#season#{key}"),
         InlineKeyboardButton(text=to_fancy_font("Send All Files"), callback_data=f"sendall_{key}")
     ])
 
-    # Pagination 
     req = message.from_user.id if message.from_user else 0
     
     try:
         int_offset = int(offset)
-    except ValueError:
+    except:
         int_offset = 0
 
     current_page = math.ceil(int_offset / 10) + 1
     total_pages = math.ceil(total_results / 10)
     
-    pagination_buttons = []
-    
     if int_offset > 0:
-        pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{int_offset-10}")
-        )
-    
-    pagination_buttons.append(
-        InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages")
-    )
-    
-    if int_offset + 10 < total_results:
-        pagination_buttons.append(
-            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{int_offset+10}")
-        )
-    
-    if pagination_buttons:
-        btn.append(pagination_buttons)
+        btn.append([
+            InlineKeyboardButton(to_fancy_font("Back"), callback_data=f"next_{req}_{key}_{int_offset-10}"),
+            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
+            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{int_offset+10}") if int_offset + 10 < total_results else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
+        ])
+    else:
+        btn.append([
+            InlineKeyboardButton(to_fancy_font(f"{current_page}/{total_pages}"), callback_data="pages"),
+            InlineKeyboardButton(to_fancy_font("Next"), callback_data=f"next_{req}_{key}_{int_offset+10}") if int_offset + 10 < total_results else InlineKeyboardButton(to_fancy_font("Next"), callback_data="pages")
+        ])
 
-    # Check Bot PM button
     btn.append([
         InlineKeyboardButton(
             text=to_fancy_font("Check Bot PM"), 
@@ -835,12 +775,11 @@ async def auto_filter(client, msg, spoll=False):
         )
     ])
 
-    # Custom Message - FIXED: No fancy font for user mention
     user_mention = message.from_user.mention if message.from_user else 'User'
     chat_title = message.chat.title if message.chat.title else 'This Group'
     
     custom_msg = f"""
-**Here I Found For Your Search: {search.replace('<', '').replace('>', '').strip()}**
+**Here I Found For Your Search: {search}**
 
 **Requested By:** {user_mention}
 **Powered By: {chat_title}**
