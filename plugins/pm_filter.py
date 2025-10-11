@@ -66,6 +66,7 @@ async def next_page(bot, query):
 
     if not files:
         return
+
     settings = await get_settings(query.message.chat.id)
     if settings['button']:
         btn = [
@@ -97,6 +98,23 @@ async def next_page(bot, query):
 
     next_btn = f"next_{req}_{key}_{n_offset}" if n_offset != 0 else None
 
+    # MODIFIED: पुरानी 'Remove ads' और 'SEND ALL' रो हटा दी गई है।
+    
+    # NEW: आपके अनुरोध के अनुसार बटन जोड़े गए (Quality, Language, Season)
+    btn.append(
+        [
+            InlineKeyboardButton(text="QUALITY", callback_data="dummy_q"), # DUMMY CALLBACK
+            InlineKeyboardButton(text="LANGUAGE", callback_data="dummy_l"), # DUMMY CALLBACK
+            InlineKeyboardButton(text="SEASON", callback_data="dummy_s") # DUMMY CALLBACK
+        ]
+    )
+    
+    # NEW: 'Check Bot PM For File' बटन जोड़ा गया
+    btn.append(
+        [InlineKeyboardButton(text="👉 Check Bot PM For File 👈", url=f"https://t.me/{temp.U_NAME}")]
+    )
+    
+    # NEW: पेजिनेशन बटन (आपकी आवश्यकतानुसार)
     pagination_buttons = []
     
     if off_set is not None:
@@ -109,11 +127,7 @@ async def next_page(bot, query):
 
     if pagination_buttons:
         btn.append(pagination_buttons)
-        
-    # NEW: "Check Bot PM" बटन जोड़ा गया
-    btn.append(
-        [InlineKeyboardButton(text="👉 Check Bot PM For File 👈", url="https://t.me/As_Freefilterbot")]
-    )
+
 
     try:
         await query.edit_message_reply_markup(
@@ -152,6 +166,17 @@ async def advantage_spoll_choker(bot, query):
 async def cb_handler(client: Client, query: CallbackQuery):
     if query.data == "close_data":
         await query.message.delete()
+        
+    # NEW: आपके डमी बटनों के लिए हैंडलर
+    elif query.data in ["dummy_q", "dummy_l", "dummy_s"]:
+        await query.answer("यह फ़िल्टरिंग विकल्प अभी उपलब्ध नहीं है। 🚧", show_alert=True)
+    
+    elif query.data.startswith("sendall"):
+        # SEND ALL बटन के लिए डमी हैंडलर - अब यह केवल एक संदेश दिखाएगा
+        await query.answer("SEND ALL फ़ीचर के लिए कृपया PM में जाँच करें।", show_alert=True)
+    
+    # बाकी cb_handler लॉजिक
+    
     elif query.data == "delallconfirm":
         userid = query.from_user.id
         chat_type = query.message.chat.type
@@ -687,24 +712,38 @@ async def auto_filter(client, msg, spoll=False):
             for file in files
         ]
 
+    # MODIFIED: 'Remove ads' और 'SEND ALL' वाली रो हटा दी गई है।
+    
+    # NEW: आपके अनुरोध के अनुसार बटन जोड़े गए (Quality, Language, Season)
+    key = f"{message.chat.id}-{message.id}"
+    btn.append(
+        [
+            InlineKeyboardButton(text="QUALITY", callback_data="dummy_q"), # DUMMY CALLBACK
+            InlineKeyboardButton(text="LANGUAGE", callback_data="dummy_l"), # DUMMY CALLBACK
+            InlineKeyboardButton(text="SEASON", callback_data="dummy_s") # DUMMY CALLBACK
+        ]
+    )
+    
+    # NEW: 'Check Bot PM For File' बटन जोड़ा गया
+    btn.append(
+        [InlineKeyboardButton(text="👉 Check Bot PM For File 👈", url=f"https://t.me/{temp.U_NAME}")]
+    )
+    
+    # NEW: पेजिनेशन बटन (आपकी आवश्यकतानुसार)
     if offset != "":
-        key = f"{message.chat.id}-{message.id}"
+        
         BUTTONS[key] = search
         req = message.from_user.id if message.from_user else 0
         total_pages = math.ceil(int(total_results) / 10)
         btn.append(
-            [InlineKeyboardButton(text=f"🗓 1 / {total_pages}", callback_data="pages"),
+            [InlineKeyboardButton(text="⏪ BACK", callback_data="pages"), # No BACK on page 1
+             InlineKeyboardButton(text=f"🗓 Pages 1 / {total_pages}", callback_data="pages"),
              InlineKeyboardButton(text="NEXT ⏩", callback_data=f"next_{req}_{key}_{offset}")]
         )
     else:
         btn.append(
             [InlineKeyboardButton(text="🗓 1/1", callback_data="pages")]
         )
-    
-    # NEW: आपकी रिक्वेस्ट के अनुसार "Check Bot PM" का बटन जोड़ा गया
-    btn.append(
-        [InlineKeyboardButton(text="👉 Check Bot PM For File 👈", url="https://t.me/As_Freefilterbot")]
-    )
     
     imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
     TEMPLATE = settings['template']
@@ -741,7 +780,7 @@ async def auto_filter(client, msg, spoll=False):
             **locals()
         )
     else:
-        cap = f"Here is what i found for your query {search}"
+        cap = f"Here is what i found for your query **{search}**"
         
     sent_message = None
     if imdb and imdb.get('poster'):
