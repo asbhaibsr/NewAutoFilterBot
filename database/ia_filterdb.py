@@ -31,6 +31,22 @@ class Media(Document):
         indexes = ('$file_name', )
         collection_name = COLLECTION_NAME
 
+# Helper function (Assuming this was present in the original bot logic)
+def unpack_new_file_id(new_file_id):
+    """Unpacks a file id to get the file_id and file_ref."""
+    if not isinstance(new_file_id, FileId):
+        new_file_id = FileId.decode(new_file_id)
+    
+    file_id = "{}_{}".format(new_file_id.media_type.value, base64.urlsafe_b64encode(pack('<i', new_file_id.file_unique_id)).decode().rstrip("=").strip())
+    
+    # file_ref will be the full file_id used for getting the file back from Telegram
+    file_ref = new_file_id.file_id
+    
+    return file_id, file_ref
+
+# --------------------------------------------------------------------------------------
+# DATABASE FUNCTIONS
+# --------------------------------------------------------------------------------------
 
 async def save_file(media):
     """Save file in database"""
@@ -140,4 +156,14 @@ async def get_search_results(query, file_type=None, max_results=10, offset=0, fi
 
 
 async def get_file_details(query):
-# ... (rest of the file remains the same)
+    """
+    Get file details from database using file_id (_id field).
+    This function was missing its indented body, causing the IndentationError.
+    """
+    return await Media.find_one({'_id': query})
+
+
+async def delete_file(query):
+    """Delete file from database using file_id (_id field)."""
+    return await Media.delete_one({'_id': query})
+
