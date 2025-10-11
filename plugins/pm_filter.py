@@ -154,7 +154,7 @@ async def next_page(bot, query):
     for i in range(0, len(lang_buttons), 3):
         btn.append(lang_buttons[i:i+3])
     
-    # Send All Files button
+    # Send All Files button - FIXED: key variable is now properly defined
     btn.append([
         InlineKeyboardButton(
             text="🚀 Sᴇɴᴅ Aʟʟ Fɪʟᴇs", 
@@ -903,6 +903,10 @@ async def auto_filter(client, msg, spoll=False):
             for file in files
         ]
 
+    # Create key for BUTTONS dictionary - FIXED: key variable is now properly defined
+    key = f"{message.chat.id}-{message.id}"
+    BUTTONS[key] = search
+
     # Filter buttons row
     btn.append([
         InlineKeyboardButton(text="🎬 Qᴜᴀʟɪᴛʏ", callback_data="quality_dummy"),
@@ -951,7 +955,7 @@ async def auto_filter(client, msg, spoll=False):
     for i in range(0, len(lang_buttons), 3):
         btn.append(lang_buttons[i:i+3])
     
-    # Send All Files button
+    # Send All Files button - FIXED: Now key is properly defined
     btn.append([
         InlineKeyboardButton(
             text="🚀 Sᴇɴᴅ Aʟʟ Fɪʟᴇs", 
@@ -968,9 +972,6 @@ async def auto_filter(client, msg, spoll=False):
     ])
 
     # Pagination
-    key = f"{message.chat.id}-{message.id}"
-    BUTTONS[key] = search
-    
     req = message.from_user.id if message.from_user else 0
     current_page = 1
     total_pages = math.ceil(total_results / 10)
