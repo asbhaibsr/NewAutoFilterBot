@@ -4,7 +4,7 @@ import random
 import asyncio
 from Script import script
 from pyrogram import Client, filters, enums
-from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, ChannelInvalid
+from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, ChannelInvalid, MessageNotModified
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database.ia_filterdb import Media, get_file_details, unpack_new_file_id
 from database.users_chats_db import db
@@ -18,6 +18,41 @@ import base64
 logger = logging.getLogger(__name__)
 
 BATCH_FILES = {}
+
+# यह कंटेंट 'Other Bots' बटन के लिए है
+BOTS_PAGES = [
+    # Page 0
+    (
+        "**🎬 पहला मूवी डाउनलोड बॉट**\n\n"
+        "यह बॉट आपको आसानी से मूवी खोजने और डाउनलोड करने में मदद करता है।\n\n"
+        "➔ **बॉट लिंक:** @asfilter_bot"
+    ),
+    # Page 1
+    (
+        "**🎞️ दूसरा मूवी डाउनलोड बॉट**\n\n"
+        "आपकी मूवी खोजने की ज़रूरतों के लिए एक और बेहतरीन बॉट।\n\n"
+        "➔ **बॉट लिंक:** @AsMoviesSearch_roBot"
+    ),
+    # Page 2
+    (
+        "**💬 एआई चैट बॉट**\n\n"
+        "यह एक सेल्फ-लर्निंग एआई चैट बॉट है जो ग्रुप में बहुत समझदारी से बात कर सकता है।\n\n"
+        "➔ **बॉट लिंक:** @askiangelbot"
+    ),
+    # Page 3
+    (
+        "**💰 कमाई करने वाला बॉट**\n\n"
+        "इस बॉट को रेफर करें और जब लोग आपके ग्रुप में आएंगे, तो यह बॉट यूजर को पैसे देगा।\n\n"
+        "➔ **बॉट लिंक:** @LinkProviderRobot"
+    ),
+    # Page 4
+    (
+        "**🧑‍💻 ओनर से संपर्क करें**\n\n"
+        "अगर आपको कोई प्रमोशन करना है या बॉट में कोई समस्या आ रही है, तो कृपया ओनर से संपर्क करें।\n\n"
+        "➔ **ओनर:** @asbhaibsr"
+    )
+]
+
 
 # MODIFIED: यह फंक्शन अब किसी भी मैसेज को दिए गए समय के बाद डिलीट कर सकता है
 async def schedule_delete(message, delay_seconds=300):
@@ -54,13 +89,14 @@ async def start(client, message):
         
     if len(message.command) != 2:
         buttons = [[
-            InlineKeyboardButton('➕ Add Me To Your Groups ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
-            ],[
-            InlineKeyboardButton('🔍 Search', switch_inline_query_current_chat=''),
-            InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
-            ],[
-            InlineKeyboardButton('ℹ️ Help', callback_data='help'),
-            InlineKeyboardButton('😊 About', callback_data='about')
+            InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
+        ],[
+            InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
+            InlineKeyboardButton('😊 ᴀʙᴏᴜᴛ', callback_data='about')
+        ],[
+            InlineKeyboardButton('🤖 ᴏᴛʜᴇʀ ʙᴏᴛs & ᴄᴏɴᴛᴀᴄᴛ 🤖', callback_data='other_bots_0')
+        ],[
+            InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇs', url='https://t.me/asbhai_bsr')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await message.reply_photo(
@@ -107,13 +143,14 @@ async def start(client, message):
         
     if len(message.command) == 2 and message.command[1] in ["subscribe", "error", "okay", "help"]:
         buttons = [[
-            InlineKeyboardButton('➕ Add Me To Your Groups ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
-            ],[
-            InlineKeyboardButton('🔍 Search', switch_inline_query_current_chat=''),
-            InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
-            ],[
-            InlineKeyboardButton('ℹ️ Help', callback_data='help'),
-            InlineKeyboardButton('😊 About', callback_data='about')
+            InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
+        ],[
+            InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
+            InlineKeyboardButton('😊 ᴀʙᴏᴜᴛ', callback_data='about')
+        ],[
+            InlineKeyboardButton('🤖 ᴏᴛʜᴇʀ ʙᴏᴛs & ᴄᴏɴᴛᴀᴄᴛ 🤖', callback_data='other_bots_0')
+        ],[
+            InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇs', url='https://t.me/asbhai_bsr')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await message.reply_photo(
@@ -163,7 +200,6 @@ async def start(client, message):
                     caption=f_caption,
                     protect_content=msg.get('protect', False),
                 )
-                # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
                 asyncio.create_task(schedule_delete(sent_msg, 300))
             except FloodWait as e:
                 await asyncio.sleep(e.x)
@@ -174,7 +210,6 @@ async def start(client, message):
                     caption=f_caption,
                     protect_content=msg.get('protect', False),
                 )
-                # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
                 asyncio.create_task(schedule_delete(sent_msg, 300))
             except Exception as e:
                 logger.warning(e, exc_info=True)
@@ -207,12 +242,10 @@ async def start(client, message):
                     f_caption = getattr(msg, 'caption', file_name)
                 try:
                     sent_msg = await msg.copy(message.chat.id, caption=f_caption, protect_content=True if protect == "/pbatch" else False)
-                    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
                     asyncio.create_task(schedule_delete(sent_msg, 300))
                 except FloodWait as e:
                     await asyncio.sleep(e.x)
                     sent_msg = await msg.copy(message.chat.id, caption=f_caption, protect_content=True if protect == "/pbatch" else False)
-                    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
                     asyncio.create_task(schedule_delete(sent_msg, 300))
                 except Exception as e:
                     logger.exception(e)
@@ -222,12 +255,10 @@ async def start(client, message):
             else:
                 try:
                     sent_msg = await msg.copy(message.chat.id, protect_content=True if protect == "/pbatch" else False)
-                    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
                     asyncio.create_task(schedule_delete(sent_msg, 300))
                 except FloodWait as e:
                     await asyncio.sleep(e.x)
                     sent_msg = await msg.copy(message.chat.id, protect_content=True if protect == "/pbatch" else False)
-                    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
                     asyncio.create_task(schedule_delete(sent_msg, 300))
                 except Exception as e:
                     logger.exception(e)
@@ -235,7 +266,6 @@ async def start(client, message):
             await asyncio.sleep(1) 
         return await sts.delete()
         
-
     files_ = await get_file_details(file_id)           
     if not files_:
         pre, file_id = ((base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))).decode("ascii")).split("_", 1)
@@ -245,7 +275,6 @@ async def start(client, message):
                 file_id=file_id,
                 protect_content=True if pre == 'filep' else False,
             )
-            # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
             asyncio.create_task(schedule_delete(msg, 300))
             filetype = msg.media
             file = getattr(msg, filetype.value)
@@ -280,22 +309,80 @@ async def start(client, message):
         caption=f_caption,
         protect_content=True if pre == 'filep' else False,
     )
-    # MODIFIED: फाइल को 5 मिनट (300 सेकंड) बाद डिलीट करने के लिए शेड्यूल किया गया
     asyncio.create_task(schedule_delete(sent_msg, 300))
 
+# 'Other Bots' बटन के लिए नया Callback Handler
+@Client.on_callback_query(filters.regex(r"^other_bots_"))
+async def other_bots_callback(client, query):
+    try:
+        page_index = int(query.data.split("_")[2])
+    except IndexError:
+        return
 
-# ... (बाकी का कोड जैसा था वैसा ही रहेगा) ...
+    buttons = []
+    nav_buttons = []
+    if page_index > 0:
+        nav_buttons.append(InlineKeyboardButton(f"⬅️ ᴘɪᴄʜʜʟᴀ", callback_data=f"other_bots_{page_index-1}"))
+    
+    if page_index < len(BOTS_PAGES) - 1:
+        nav_buttons.append(InlineKeyboardButton(f"ᴀɢʟᴀ ➡️", callback_data=f"other_bots_{page_index+1}"))
+    
+    if nav_buttons:
+        buttons.append(nav_buttons)
+    
+    buttons.append([InlineKeyboardButton("🔙 ᴠᴀᴀᴘᴀs", callback_data="start_back")])
+
+    reply_markup = InlineKeyboardMarkup(buttons)
+
+    try:
+        await query.message.edit_caption(
+            caption=BOTS_PAGES[page_index],
+            reply_markup=reply_markup
+        )
+    except MessageNotModified:
+        pass
+    except Exception as e:
+        logger.error(f"Could not edit message for other_bots: {e}")
+
+# 'Back to Start' बटन के लिए Callback Handler
+@Client.on_callback_query(filters.regex("start_back"))
+async def start_back_callback(client, query):
+    buttons = [[
+        InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
+    ],[
+        InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
+        InlineKeyboardButton('😊 ᴀʙᴏᴜᴛ', callback_data='about')
+    ],[
+        InlineKeyboardButton('🤖 ᴏᴛʜᴇʀ ʙᴏᴛs & ᴄᴏɴᴛᴀᴄᴛ 🤖', callback_data='other_bots_0')
+    ],[
+        InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇs', url='https://t.me/asbhai_bsr')
+    ]]
+    reply_markup = InlineKeyboardMarkup(buttons)
+    
+    try:
+        await query.message.edit_caption(
+            caption=script.START_TXT.format(query.from_user.mention, temp.U_NAME, temp.B_NAME),
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logger.error(f"Error in start_back_callback: {e}")
+
 @Client.on_message(filters.private & filters.text & filters.incoming & ~filters.command(["start", "help", "settings", "id", "status", "batch", "connect", "disconnect", "stats", "set_template"]))
 async def pm_text_search_handler(client, message):
     """Handles text messages in PM that are not commands, by suggesting to join the group."""
     
-    # Custom Message and Button for PM Search
     buttons = [[
         InlineKeyboardButton('🎬 Free Movie Search Group 🍿', url='https://t.me/freemoviesearchgroup')
     ]]
     reply_markup = InlineKeyboardMarkup(buttons)
     
-    text = f"**❌ आप यहाँ (PM) में मूवी सर्च नहीं कर सकते।**\n\nकृपया हमारे **फ्री मूवी सर्च ग्रुप** को जॉइन करें और वहाँ मूवी सर्च करें। 👇"
+    text = (
+        "**❌ आप यहाँ (PM) में मूवी सर्च नहीं कर सकते।**\n\n"
+        "कृपया हमारे **फ्री मूवी सर्च ग्रुप** को जॉइन करें और वहाँ मूवी सर्च करें। 👇\n\n"
+        "--- \n\n"
+        "**❌ You cannot search for movies here (in PM).**\n\n"
+        "Please join our **Free Movie Search Group** and search for movies there. 👇"
+    )
     
     await message.reply_text(
         text=text,
@@ -304,10 +391,8 @@ async def pm_text_search_handler(client, message):
         parse_mode=enums.ParseMode.MARKDOWN
     )
                     
-
 @Client.on_message(filters.command('channel') & filters.user(ADMINS))
 async def channel_info(bot, message):
-           
     """Send basic information of channel"""
     if isinstance(CHANNELS, (int, str)):
         channels = [CHANNELS]
@@ -328,7 +413,6 @@ async def channel_info(bot, message):
             logger.error(f"Error getting chat info for channel {channel}: {e}")
             text += f'\n(Error getting info for {channel})'
 
-
     text += f'\n\n**Total:** {len(CHANNELS)}'
 
     if len(text) < 4096:
@@ -339,7 +423,6 @@ async def channel_info(bot, message):
             f.write(text)
         await message.reply_document(file)
         os.remove(file)
-
 
 @Client.on_message(filters.command('logs') & filters.user(ADMINS))
 async def log_file(bot, message):
@@ -384,8 +467,6 @@ async def delete(bot, message):
         if result.deleted_count:
             await msg.edit('File is successfully deleted from database')
         else:
-            # files indexed before https://github.com/EvamariaTG/EvaMaria/commit/f3d2a1bcb155faf44178e5d7a685a1b533e714bf#diff-86b613edf1748372103e94cacff3b578b36b698ef9c16817bb98fe9ef22fb669R39 
-            # have original file name.
             result = await Media.collection.delete_many({
                 'file_name': media.file_name,
                 'file_size': media.file_size,
@@ -395,7 +476,6 @@ async def delete(bot, message):
                 await msg.edit('File is successfully deleted from database')
             else:
                 await msg.edit('File not found in database')
-
 
 @Client.on_message(filters.command('deleteall') & filters.user(ADMINS))
 async def delete_all_index(bot, message):
@@ -418,13 +498,11 @@ async def delete_all_index(bot, message):
         quote=True,
     )
 
-
 @Client.on_callback_query(filters.regex(r'^autofilter_delete'))
 async def delete_all_index_confirm(bot, message):
     await Media.collection.drop()
     await message.answer('Piracy Is Crime')
     await message.message.edit('Succesfully Deleted All The Indexed Files.')
-
 
 @Client.on_message(filters.command('settings'))
 async def settings(client, message):
@@ -537,8 +615,6 @@ async def settings(client, message):
             parse_mode=enums.ParseMode.HTML,
             reply_to_message_id=message.id
         )
-
-
 
 @Client.on_message(filters.command('set_template'))
 async def save_template(client, message):
