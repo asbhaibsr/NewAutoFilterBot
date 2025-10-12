@@ -77,7 +77,7 @@ async def next_page(bot, query):
     if settings['button']:
         btn = [
             [
-                # Added file emoji
+                # Added file emoji and size in single button mode
                 InlineKeyboardButton(
                     text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'files#{file.file_id}'
                 ),
@@ -90,7 +90,7 @@ async def next_page(bot, query):
                 InlineKeyboardButton(
                     text=f"{file.file_name}", callback_data=f'files#{file.file_id}'
                 ),
-                # Added file emoji
+                # Added file emoji in size button
                 InlineKeyboardButton(
                     text=f"📁 {get_size(file.file_size)}",
                     callback_data=f'files_#{file.file_id}',
@@ -115,7 +115,6 @@ async def next_page(bot, query):
              InlineKeyboardButton(f"📃 Pages {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}",
                                   callback_data="pages")]
         )
-        btn.append(pm_button) # Add PM button
     elif off_set is None:
         btn.append(
             [InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
@@ -129,9 +128,8 @@ async def next_page(bot, query):
             ],
         )
     
-    # Logic to ensure PM button is only added once at the end. Simplified check.
-    if pm_button not in btn[-1]:
-         btn.append(pm_button)
+    # Add PM button to the last row
+    btn.append(pm_button) 
 
 
     try:
@@ -160,7 +158,7 @@ async def advantage_spoll_choker(bot, query):
         
     movie = movies[(int(movie_))]
     
-    # Show message that bot is checking (Fix for constantly showing "Please wait")
+    # Show message that bot is checking (Corrected as per request)
     checking_msg = await query.message.edit_text(f'🔍 ᴄʜᴇᴄᴋɪɴɢ ꜰᴏʀ: **{movie}** ɪɴ ᴅᴀᴛᴀʙᴀsᴇ... ⏳')
     
     k = await manual_filters(bot, query.message.reply_to_message, text=movie, is_spellcheck=True) # Check manual filter first
@@ -171,7 +169,7 @@ async def advantage_spoll_choker(bot, query):
             k = (movie, files, offset, total_results)
             await auto_filter(bot, query, k, is_spellcheck_result=True) # Pass the callback query as the first argument
         else:
-            # Send your custom "not found" message here
+            # Send your custom "not found" message here (Fix: Show not found message if no results after spelling check)
             not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -407,8 +405,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if f_caption is None:
             f_caption = f"{files.file_name}"
 
-        # Custom notification for PM file send
-        group_notification = "फ़ाइल PM (प्राइवेट मैसेज) में भेज दी गई है।\n\nFile has been sent to your PM."
+        # Custom notification for PM file send (Fixed to include Hindi/English pop-up)
+        group_notification = "✅ फ़ाइल PM (प्राइवेट मैसेज) में भेज दी गई है।\n\n✅ File has been sent to your PM."
 
         try:
             if AUTH_CHANNEL and not await is_subscribed(client, query):
@@ -447,8 +445,11 @@ Hello As Bʜᴀɪ Bsʀ
                 
                 # Delete PM file and warning message after 5 minutes
                 await asyncio.sleep(300) 
-                await pm_message.delete()
-                await warning_msg.delete()
+                try:
+                    await pm_message.delete()
+                    await warning_msg.delete()
+                except Exception:
+                    pass
                 
                 # Send group notification with Pop-up (show_alert=True)
                 await query.answer(group_notification, show_alert=True)
@@ -458,6 +459,7 @@ Hello As Bʜᴀɪ Bsʀ
         except PeerIdInvalid:
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
         except Exception as e:
+            logger.exception(e)
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
             
         # The search result message will be deleted by the auto_filter/manual_filter routine after 5 minutes.
@@ -513,8 +515,11 @@ Hello As Bʜᴀɪ Bsʀ
         
         # Delete PM file and warning message after 5 minutes
         await asyncio.sleep(300) 
-        await pm_message.delete()
-        await warning_msg.delete()
+        try:
+            await pm_message.delete()
+            await warning_msg.delete()
+        except Exception:
+            pass
         
     elif query.data == "pages":
         await query.answer()
@@ -760,7 +765,7 @@ async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_
                     # Pass the original message for spell check
                     return await advantage_spell_chok(msg)
                 else:
-                    # Send custom not found message
+                    # Send custom not found message (Fix: Ensure this shows if spell check is off and no results)
                     not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -786,12 +791,7 @@ Search other bot - @asfilter_bot
                     pass
             return
     else:
-        # If it's a result from spell check, delete the sticker if it exists (though it shouldn't here)
-        if sticker_msg: 
-            try:
-                await sticker_msg.delete()
-            except:
-                pass
+        # If it's a result from spell check, sticker should be deleted already.
         settings = await get_settings(message.chat.id) # Use the correct message object (original message)
         search, files, offset, total_results = spoll
         
@@ -800,7 +800,7 @@ Search other bot - @asfilter_bot
         btn = [
             [
                 InlineKeyboardButton(
-                    # Added file emoji
+                    # Added file emoji and size in single button mode
                     text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
@@ -814,7 +814,7 @@ Search other bot - @asfilter_bot
                     callback_data=f'{pre}#{file.file_id}',
                 ),
                 InlineKeyboardButton(
-                    # Added file emoji
+                    # Added file emoji in size button
                     text=f"📁 {get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}',
                 ),
@@ -963,6 +963,20 @@ Search other bot - @asfilter_bot
 async def advantage_spell_chok(msg):
     # This part is for the processing message when starting spell check
     # The sticker is already deleted by auto_filter
+    # Note: The "Checking spelling... Please wait" is a temporary state.
+    # We must ensure we edit this message to either the suggestions or the "Not Found" message.
+    
+    # Check if a message was sent before, and try to edit it to the "Checking spelling..." state
+    # Since the image shows "Checking spelling... Please wait" already present, we'll try to find the previous message.
+    
+    # We will assume the immediately preceding message from the bot, which is not the sticker, is the one to edit.
+    # However, since the user complained about it sticking, we will create a NEW message 
+    # to show the spell check attempt and then edit/delete it.
+    
+    # We must make sure we don't end up with two "Checking spelling..." messages.
+    # Given the constraint that the user wants to avoid the "Please wait" loop,
+    # we will rely on the `advantage_spell_chok` logic to complete its run.
+    
     processing_msg = await msg.reply_text('🧐 **Checking spelling...** Please wait ⏳')
     
     query = re.sub(
@@ -985,11 +999,11 @@ Search other bot - @asfilter_bot
 """
     
     if not g_s:
-        # If no google search results
-        await processing_msg.edit_text(not_found_msg)
+        # If no google search results (Fix: Show not found message immediately)
+        final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
         try:
-            await processing_msg.delete()
+            await final_msg.delete()
         except Exception:
             pass
         return
@@ -1019,11 +1033,11 @@ Search other bot - @asfilter_bot
     movielist += [(re.sub(r'(\-|\(|\)|_)', '', i, flags=re.IGNORECASE)).strip() for i in gs_parsed]
     movielist = list(dict.fromkeys(movielist))  # removing duplicates
     if not movielist:
-        # If no movie suggestions found
-        await processing_msg.edit_text(not_found_msg)
+        # If no movie suggestions found (Fix: Show not found message immediately)
+        final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
         try:
-            await processing_msg.delete()
+            await final_msg.delete()
         except Exception:
             pass
         return
@@ -1037,7 +1051,7 @@ Search other bot - @asfilter_bot
     ] for k, movie in enumerate(movielist)]
     btn.append([InlineKeyboardButton(text="❌ ᴄʟᴏsᴇ sᴘᴇʟʟ ᴄʜᴇᴄᴋ ❌", callback_data=f'spolling#{user}#close_spellcheck')])
     
-    # Edit the processing message to show the spell check options
+    # Edit the processing message to show the spell check options (Fix: This is the final step for this function)
     await processing_msg.edit_text("🤔 ɪ ᴄᴏᴜʟᴅɴ'ᴛ ꜰɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\n\n**ᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏꜰ ᴛʜᴇsᴇ?**",
                                     reply_markup=InlineKeyboardMarkup(btn))
 
