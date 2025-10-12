@@ -386,17 +386,19 @@ async def cb_handler(client: Client, query: CallbackQuery):
             alert = alert.replace("\\n", "\n").replace("\\t", "\t")
             await query.answer(alert, show_alert=True)
             
-    # Fix 2: Logic for sending file to PM and showing pop-up notification
-    if query.data.startswith("file"):
+    # START OF THE CORRECTED CODE BLOCK
+    elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
         if not files_:
             return await query.answer('No such file exist.')
+
         files = files_[0]
         title = files.file_name
         size = get_size(files.file_size)
         f_caption = files.caption
         settings = await get_settings(query.message.chat.id)
+        
         if CUSTOM_FILE_CAPTION:
             try:
                 f_caption = CUSTOM_FILE_CAPTION.format(file_name='' if title is None else title,
@@ -408,31 +410,23 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if f_caption is None:
             f_caption = f"{files.file_name}"
 
-        # Custom notification for PM file send
-        group_notification = "✅ फ़ाइल PM (प्राइवेट मैसेज) में भेज दी गई है।\n\n✅ File has been sent to your PM."
-        
-        # Check subscription and botpm setting
-        is_sub = AUTH_CHANNEL and not await is_subscribed(client, query)
-        is_botpm = settings['botpm']
-
+        # Check if the user is subscribed to the AUTH_CHANNEL
+        if AUTH_CHANNEL and not await is_subscribed(client, query):
+            # If not subscribed, show a pop-up with a link to the bot
+            await query.answer(url=f"https://t.me/{temp.U_NAME}?start=subscribe")
+            return
+            
         try:
-            if is_sub or is_botpm:
-                # Send URL to PM if not subscribed or botpm is enabled
-                await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
-                # Send group notification pop-up (Fix: Ensure this is called)
-                await query.answer(group_notification, show_alert=True)
-                return
-            else:
-                # Direct send file in PM
-                pm_message = await client.send_cached_media(
-                    chat_id=query.from_user.id,
-                    file_id=file_id,
-                    caption=f_caption,
-                    protect_content=True if ident == "filep" else False 
-                )
-                
-                # Send separate PM message
-                pm_warning_message = """
+            # Try to send the file to the user's PM
+            pm_message = await client.send_cached_media(
+                chat_id=query.from_user.id,
+                file_id=file_id,
+                caption=f_caption,
+                protect_content=True if ident == "filep" else False 
+            )
+            
+            # Send the warning message in PM
+            pm_warning_message = """
 Hello,
 
 ⚠️ᴛʜɪs ғɪʟᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ᴀғᴛᴇʀ 5 ᴍɪɴᴜᴛᴇs
@@ -442,33 +436,37 @@ Hello,
 मूवी यहां डाउनलोड ना करे क्योंकि | मूवी 🍿 5 Minutes में डिलीट कर दी जायेगी
 कृपया कही फॉरवर्ड करे के डाउनलोड करे
 """
-                warning_msg = await client.send_message(
-                    chat_id=query.from_user.id,
-                    text=pm_warning_message,
-                    reply_to_message_id=pm_message.id
-                )
-                
-                # Delete PM file and warning message after 5 minutes
-                await asyncio.sleep(300) 
-                try:
-                    await pm_message.delete()
-                    await warning_msg.delete()
-                except Exception:
-                    pass
-                
-                # Send group notification with Pop-up (show_alert=True)
-                await query.answer(group_notification, show_alert=True)
-                
+            warning_msg = await client.send_message(
+                chat_id=query.from_user.id,
+                text=pm_warning_message,
+                reply_to_message_id=pm_message.id
+            )
+            
+            # Schedule deletion of the file and warning in PM
+            await asyncio.sleep(300) 
+            try:
+                await pm_message.delete()
+                await warning_msg.delete()
+            except Exception:
+                pass
+            
+            # If file sending is successful, show the success pop-up in the group
+            group_notification = "✅ फ़ाइल आपके PM (प्राइवेट मैसेज) में भेज दी गई है।\n\n✅ File has been sent to your PM."
+            await query.answer(group_notification, show_alert=True)
+            
         except UserIsBlocked:
-            await query.answer('Unblock the bot mahn !', show_alert=True)
+            # If the user has blocked the bot
+            await query.answer('आपने बॉट को ब्लॉक किया हुआ है। कृपया अनब्लॉक करें।', show_alert=True)
         except PeerIdInvalid:
+            # If the user has not started the bot yet
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
         except Exception as e:
+            # For any other errors
             logger.exception(e)
-            await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
+            await query.answer(f"An error occurred: {e}", show_alert=True)
             
-        # The search result message will be deleted by the auto_filter/manual_filter routine after 5 minutes.
-            
+    # END OF THE CORRECTED CODE BLOCK
+
     elif query.data.startswith("checksub"):
         if AUTH_CHANNEL and not await is_subscribed(client, query):
             await query.answer("I Like Your Smartness, But Don't Be Oversmart 😒", show_alert=True)
@@ -1116,3 +1114,4 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
                 return True # Return True if manual filter was found and sent
     else:
         return False # Return False if no manual filter was found
+
