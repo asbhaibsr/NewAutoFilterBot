@@ -163,14 +163,8 @@ async def advantage_spoll_choker(bot, query):
     
     k = await manual_filters(bot, query.message.reply_to_message, text=movie, is_spellcheck=True) # Check manual filter first
     
-    if k == False: # If manual filter didn't find anything
-        files, offset, total_results = await get_search_results(movie, offset=0, filter=True)
-        if files:
-            k = (movie, files, offset, total_results)
-            await auto_filter(bot, query, k, is_spellcheck_result=True) # Pass the callback query as the first argument
-        else:
-            # Send your custom "not found" message here (Fix: Show not found message if no results after spelling check)
-            not_found_msg = """
+    # Custom not found message
+    not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
 SORRY, we haven't find your file. Maybe you made a mistake? Please try to write correctly 😊 
@@ -179,7 +173,14 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 
 Search other bot - @asfilter_bot
 """
-            # Edit the checking message to the not found message
+    
+    if k == False: # If manual filter didn't find anything
+        files, offset, total_results = await get_search_results(movie, offset=0, filter=True)
+        if files:
+            k = (movie, files, offset, total_results)
+            await auto_filter(bot, query, k, is_spellcheck_result=True) # Pass the callback query as the first argument
+        else:
+            # Send your custom "not found" message here (Fix: Show not found message if no results after spelling check)
             final_msg = await checking_msg.edit_text(not_found_msg)
             # Delete message after 2 minutes (120 seconds)
             await asyncio.sleep(120)
@@ -384,6 +385,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
             alert = alerts[int(i)]
             alert = alert.replace("\\n", "\n").replace("\\t", "\t")
             await query.answer(alert, show_alert=True)
+            
+    # Fix 2: Logic for sending file to PM and showing pop-up notification
     if query.data.startswith("file"):
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
@@ -405,20 +408,22 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if f_caption is None:
             f_caption = f"{files.file_name}"
 
-        # Custom notification for PM file send (Fixed to include Hindi/English pop-up)
+        # Custom notification for PM file send
         group_notification = "✅ फ़ाइल PM (प्राइवेट मैसेज) में भेज दी गई है।\n\n✅ File has been sent to your PM."
+        
+        # Check subscription and botpm setting
+        is_sub = AUTH_CHANNEL and not await is_subscribed(client, query)
+        is_botpm = settings['botpm']
 
         try:
-            if AUTH_CHANNEL and not await is_subscribed(client, query):
-                # Send URL to PM if not subscribed
+            if is_sub or is_botpm:
+                # Send URL to PM if not subscribed or botpm is enabled
                 await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
-                return
-            elif settings['botpm']:
-                # Send URL to PM if botpm is enabled
-                await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
+                # Send group notification pop-up (Fix: Ensure this is called)
+                await query.answer(group_notification, show_alert=True)
                 return
             else:
-                # Send file in PM
+                # Direct send file in PM
                 pm_message = await client.send_cached_media(
                     chat_id=query.from_user.id,
                     file_id=file_id,
@@ -760,13 +765,8 @@ async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_
                 except:
                     pass
             
-            if not files:
-                if settings["spell_check"]:
-                    # Pass the original message for spell check
-                    return await advantage_spell_chok(msg)
-                else:
-                    # Send custom not found message (Fix: Ensure this shows if spell check is off and no results)
-                    not_found_msg = """
+            # Custom not found message
+            not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
 SORRY, we haven't find your file. Maybe you made a mistake? Please try to write correctly 😊 
@@ -775,6 +775,13 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 
 Search other bot - @asfilter_bot
 """
+
+            if not files:
+                if settings["spell_check"]:
+                    # Pass the original message for spell check
+                    return await advantage_spell_chok(msg)
+                else:
+                    # Send custom not found message (Fix: Ensure this shows if spell check is off and no results)
                     k = await msg.reply(not_found_msg)
                     # Delete message after 2 minutes (120 seconds)
                     await asyncio.sleep(120)
@@ -961,21 +968,6 @@ Search other bot - @asfilter_bot
 
 
 async def advantage_spell_chok(msg):
-    # This part is for the processing message when starting spell check
-    # The sticker is already deleted by auto_filter
-    # Note: The "Checking spelling... Please wait" is a temporary state.
-    # We must ensure we edit this message to either the suggestions or the "Not Found" message.
-    
-    # Check if a message was sent before, and try to edit it to the "Checking spelling..." state
-    # Since the image shows "Checking spelling... Please wait" already present, we'll try to find the previous message.
-    
-    # We will assume the immediately preceding message from the bot, which is not the sticker, is the one to edit.
-    # However, since the user complained about it sticking, we will create a NEW message 
-    # to show the spell check attempt and then edit/delete it.
-    
-    # We must make sure we don't end up with two "Checking spelling..." messages.
-    # Given the constraint that the user wants to avoid the "Please wait" loop,
-    # we will rely on the `advantage_spell_chok` logic to complete its run.
     
     processing_msg = await msg.reply_text('🧐 **Checking spelling...** Please wait ⏳')
     
@@ -998,8 +990,8 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 Search other bot - @asfilter_bot
 """
     
+    # Fix 1: Stop and send not found message if no google search results
     if not g_s:
-        # If no google search results (Fix: Show not found message immediately)
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
         try:
@@ -1032,8 +1024,9 @@ Search other bot - @asfilter_bot
                 movielist += [movie.get('title') for movie in imdb_s]
     movielist += [(re.sub(r'(\-|\(|\)|_)', '', i, flags=re.IGNORECASE)).strip() for i in gs_parsed]
     movielist = list(dict.fromkeys(movielist))  # removing duplicates
+    
+    # Fix 1: Stop and send not found message if no movie suggestions found
     if not movielist:
-        # If no movie suggestions found (Fix: Show not found message immediately)
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
         try:
@@ -1051,7 +1044,7 @@ Search other bot - @asfilter_bot
     ] for k, movie in enumerate(movielist)]
     btn.append([InlineKeyboardButton(text="❌ ᴄʟᴏsᴇ sᴘᴇʟʟ ᴄʜᴇᴄᴋ ❌", callback_data=f'spolling#{user}#close_spellcheck')])
     
-    # Edit the processing message to show the spell check options (Fix: This is the final step for this function)
+    # Edit the processing message to show the spell check options
     await processing_msg.edit_text("🤔 ɪ ᴄᴏᴜʟᴅɴ'ᴛ ꜰɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\n\n**ᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏꜰ ᴛʜᴇsᴇ?**",
                                     reply_markup=InlineKeyboardMarkup(btn))
 
