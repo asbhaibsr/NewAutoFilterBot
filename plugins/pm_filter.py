@@ -433,7 +433,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 
                 # Send separate PM message
                 pm_warning_message = """
-Hello As Bʜᴀɪ Bsʀ
+Hello,
 
 ⚠️ᴛʜɪs ғɪʟᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ᴀғᴛᴇʀ 5 ᴍɪɴᴜᴛᴇs
 
@@ -503,7 +503,7 @@ Hello As Bʜᴀɪ Bsʀ
         
         # Send separate PM message
         pm_warning_message = """
-Hello As Bʜᴀɪ Bsʀ
+Hello,
 
 ⚠️ᴛʜɪs ғɪʟᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ᴀғᴛᴇʀ 5 ᴍɪɴᴜᴛᴇs
 
@@ -533,7 +533,7 @@ Hello As Bʜᴀɪ Bsʀ
             InlineKeyboardButton('➕ Add Me To Your Groups ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
         ], [
             InlineKeyboardButton('🔍 Search', switch_inline_query_current_chat=''),
-            InlineKeyboardButton('🤖 Updates', url='https://t.me/TechMagazineYT')
+            InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
         ], [
             InlineKeyboardButton('ℹ️ Help', callback_data='help'),
             InlineKeyboardButton('😊 About', callback_data='about')
@@ -564,7 +564,7 @@ Hello As Bʜᴀɪ Bsʀ
         )
     elif query.data == "about":
         buttons = [[
-            InlineKeyboardButton('🤖 Updates', url='https://t.me/TechMagazineYT'),
+            InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr'),
             InlineKeyboardButton('♥️ Source', callback_data='source')
         ], [
             InlineKeyboardButton('🏠 Home', callback_data='start'),
