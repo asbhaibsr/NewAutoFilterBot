@@ -144,3 +144,44 @@ class Database:
 
 
 db = Database(DATABASE_URI, DATABASE_NAME)
+
+import datetime
+from info import DATABASE_NAME, PREMIUM_USERS_COLLECTION, SHORTLINK_COLLECTION
+
+# प्रीमियम यूजर्स के लिए कलेक्शन
+premium_users_col = db.client[DATABASE_NAME][PREMIUM_USERS_COLLECTION]
+# शॉर्टलिंक टोकन के लिए कलेक्शन
+shortlinks_col = db.client[DATABASE_NAME][SHORTLINK_COLLECTION]
+
+# प्रीमियम यूजर्स को मैनेज करने के लिए फंक्शन्स
+async def grant_premium_access(user_id: int, days: int):
+    expiry_date = datetime.datetime.now() + datetime.timedelta(days=days)
+    await premium_users_col.update_one(
+        {"_id": user_id},
+        {"$set": {"expiry_date": expiry_date}},
+        upsert=True
+    )
+
+async def revoke_premium_access(user_id: int):
+    await premium_users_col.delete_one({"_id": user_id})
+
+async def check_if_premium(user_id: int) -> bool:
+    user = await premium_users_col.find_one({"_id": user_id})
+    if user and user.get("expiry_date") and user["expiry_date"] > datetime.datetime.now():
+        return True
+    
+    # यदि यूजर का प्रीमियम समाप्त हो गया है तो उसे हटा दें
+    elif user:
+        await revoke_premium_access(user_id)
+        
+    return False
+
+# शॉर्टलिंक टोकन को मैनेज करने के लिए फंक्शन्स
+async def save_shortlink(token: str, file_id: str):
+    await shortlinks_col.insert_one({"_id": token, "file_id": file_id, "timestamp": datetime.datetime.now()})
+
+async def get_shortlink(token: str):
+    return await shortlinks_col.find_one({"_id": token})
+
+async def delete_shortlink(token: str):
+    await shortlinks_col.delete_one({"_id": token})
