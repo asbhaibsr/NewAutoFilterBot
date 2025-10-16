@@ -374,25 +374,13 @@ async def other_bots_callback(client, query):
 # 'Back to Start' बटन के लिए Callback Handler
 @Client.on_callback_query(filters.regex("start_back"))
 async def start_back_callback(client, query):
-@Client.on_callback_query(filters.regex("buy_premium"))
-async def buy_premium_callback(client, query):
-    buttons = [[
-        InlineKeyboardButton("🔙 वापस", callback_data="start_back")
-    ]]
-    reply_markup = InlineKeyboardMarkup(buttons)
-    await query.message.edit_caption(
-        caption=script.PREMIUM_TXT,
-        reply_markup=reply_markup
-    )
-    
     buttons = [[
         InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
     ],[
-        InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
+        InlineKeyboardButton('✨ Buy Premium ✨', callback_data='buy_premium'),
         InlineKeyboardButton('😊 ᴀʙᴏᴜᴛ', callback_data='about')
     ],[
-        InlineKeyboardButton('🤖 ᴏᴛʜᴇʀ ʙᴏᴛs & ᴄᴏɴᴛᴀᴄᴛ 🤖', callback_data='other_bots_0')
-    ],[
+        InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
         InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇs', url='https://t.me/asbhai_bsr')
     ]]
     reply_markup = InlineKeyboardMarkup(buttons)
@@ -400,10 +388,29 @@ async def buy_premium_callback(client, query):
     try:
         await query.message.edit_caption(
             caption=script.START_TXT.format(query.from_user.mention, temp.U_NAME, temp.B_NAME),
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            parse_mode=enums.ParseMode.HTML
         )
+    except MessageNotModified:
+        pass # If the message is already the start message, just ignore it
     except Exception as e:
         logger.error(f"Error in start_back_callback: {e}")
+
+@Client.on_callback_query(filters.regex("buy_premium"))
+async def buy_premium_callback(client, query):
+    buttons = [[
+        InlineKeyboardButton("🔙 वापस", callback_data="start_back")
+    ]]
+    reply_markup = InlineKeyboardMarkup(buttons)
+    
+    try:
+        await query.message.edit_caption(
+            caption=script.PREMIUM_TXT,
+            reply_markup=reply_markup,
+            parse_mode=enums.ParseMode.HTML
+        )
+    except Exception as e:
+        logger.error(f"Error in buy_premium_callback: {e}")
 
 @Client.on_message(filters.private & filters.text & filters.incoming & ~filters.command(["start", "help", "settings", "id", "status", "batch", "connect", "disconnect", "stats", "set_template"]))
 async def pm_text_search_handler(client, message):
