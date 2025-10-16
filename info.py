@@ -37,7 +37,7 @@ DATABASE_NAME = environ.get('DATABASE_NAME', "Rajappan")
 COLLECTION_NAME = environ.get('COLLECTION_NAME', 'Telegram_files')
 # Shortlink and Premium Settings
 GOOGLE_SCRIPT_URL = environ.get('GOOGLE_SCRIPT_URL', "https://script.google.com/macros/s/AKfycbwDqKLE1bZjwBcNT8wDA2SlKs821Gq7bhea8JOygiHfyPyGuATAKXWY_LtvOwlFwL9n6w/exec")
-SHORTLINK_ENABLED = is_enabled(environ.get('SHORTLINK_ENABLED', "False"), False) # True करने पर शॉर्टलिंक चालू होगा
+SHORTLINK_ENABLED = is_enabled(environ.get('SHORTLINK_ENABLED', "True"), True) # True करने पर शॉर्टलिंक चालू होगा
 PREMIUM_USERS_COLLECTION = environ.get('PREMIUM_USERS_COLLECTION', 'premium_users')
 SHORTLINK_COLLECTION = environ.get('SHORTLINK_COLLECTION', 'shortlinks')
 
