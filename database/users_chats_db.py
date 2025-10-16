@@ -149,9 +149,9 @@ import datetime
 from info import DATABASE_NAME, PREMIUM_USERS_COLLECTION, SHORTLINK_COLLECTION
 
 # प्रीमियम यूजर्स के लिए कलेक्शन
-premium_users_col = db_client[DATABASE_NAME][PREMIUM_USERS_COLLECTION]
+premium_users_col = db._client[DATABASE_NAME][PREMIUM_USERS_COLLECTION]
 # शॉर्टलिंक टोकन के लिए कलेक्शन
-shortlinks_col = db_client[DATABASE_NAME][SHORTLINK_COLLECTION]
+shortlinks_col = db._client[DATABASE_NAME][SHORTLINK_COLLECTION]
 
 # प्रीमियम यूजर्स को मैनेज करने के लिए फंक्शन्स
 async def grant_premium_access(user_id: int, days: int):
