@@ -1,5 +1,3 @@
-# commands.py
-
 import os
 import logging
 import random
@@ -9,7 +7,8 @@ from pyrogram import Client, filters, enums
 from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, ChannelInvalid, MessageNotModified
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database.ia_filterdb import Media, get_file_details, unpack_new_file_id
-from database.users_chats_db import db
+from database.users_chats_db import db, check_if_premium, grant_premium_access, revoke_premium_access
+
 from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT
 from utils import get_settings, get_size, is_subscribed, save_group_settings, temp
 from database.connections_mdb import active_connection
@@ -65,39 +64,63 @@ async def schedule_delete(message, delay_seconds=300):
     except Exception as e:
         logger.warning(f"Error deleting message: {e}")
 
+# commands.py में पुराना start function हटाकर यह नया function डालें
+
 @Client.on_message(filters.command("start") & filters.incoming)
 async def start(client, message):
     if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
         buttons = [
-            [
-                InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
-            ],
-            [
-                InlineKeyboardButton('ℹ️ Help', url=f"https://t.me/{temp.U_NAME}?start=help"),
-            ]
-            ]
+            [InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')],
+            [InlineKeyboardButton('ℹ️ Help', url=f"https://t.me/{temp.U_NAME}?start=help")]
+        ]
         reply_markup = InlineKeyboardMarkup(buttons)
         await message.reply(script.START_TXT.format(message.from_user.mention if message.from_user else message.chat.title, temp.U_NAME, temp.B_NAME), reply_markup=reply_markup)
-        await asyncio.sleep(2)
-        if not await db.get_chat(message.chat.id):
-            total=await client.get_chat_members_count(message.chat.id)
-            await client.send_message(LOG_CHANNEL, script.LOG_TEXT_G.format(message.chat.title, message.chat.id, total, "Unknown"))       
-            await db.add_chat(message.chat.id, message.chat.title)
-        return 
-    
+        return
+
     if not await db.is_user_exist(message.from_user.id):
         await db.add_user(message.from_user.id, message.from_user.first_name)
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
+
+    # --- शॉर्टलिंक से रीडायरेक्ट होने वाले यूजर्स के लिए लॉजिक ---
+    if len(message.command) > 1 and message.command[1].startswith("download_"):
+        token = message.command[1].split("_")[1]
+        file_info = await db.get_shortlink(token)
+
+        if file_info:
+            file_id = file_info.get("file_id")
+            await db.delete_shortlink(token) # टोकन का दोबारा इस्तेमाल रोकने के लिए उसे डिलीट करें
+            
+            files_ = await get_file_details(file_id)
+            if not files_:
+                return await message.reply('फ़ाइल मौजूद नहीं है।')
+
+            file = files_[0]
+            f_caption = file.caption or f"{file.file_name}"
+            
+            try:
+                sent_msg = await client.send_cached_media(
+                    chat_id=message.from_user.id,
+                    file_id=file_id,
+                    caption=f_caption
+                )
+                # 5 मिनट बाद फाइल डिलीट करने का टास्क
+                asyncio.create_task(schedule_delete(sent_msg, 300))
+            except Exception as e:
+                logger.error(e)
+                await message.reply("फ़ाइल भेजने में कोई त्रुटि हुई।")
+        else:
+            await message.reply("यह डाउनलोड लिंक अमान्य या समाप्त हो गया है।")
+        return
         
+    # --- सामान्य /start कमांड लॉजिक ---
     if len(message.command) != 2:
         buttons = [[
             InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
         ],[
-            InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
+            InlineKeyboardButton('✨ Buy Premium ✨', callback_data='buy_premium'),
             InlineKeyboardButton('😊 ᴀʙᴏᴜᴛ', callback_data='about')
         ],[
-            InlineKeyboardButton('🤖 ᴏᴛʜᴇʀ ʙᴏᴛs & ᴄᴏɴᴛᴀᴄᴛ 🤖', callback_data='other_bots_0')
-        ],[
+            InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
             InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇs', url='https://t.me/asbhai_bsr')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -108,7 +131,9 @@ async def start(client, message):
             parse_mode=enums.ParseMode.HTML
         )
         return
-        
+    
+    # यह नीचे का कोड आपके commands.py में पहले से मौजूद है, उसे वैसा ही रहने दें
+    # (The rest of the start function logic for deep links, batch, etc., remains)
     if AUTH_CHANNEL and not await is_subscribed(client, message):
         try:
             auth_channel_id = int(AUTH_CHANNEL)
@@ -349,6 +374,17 @@ async def other_bots_callback(client, query):
 # 'Back to Start' बटन के लिए Callback Handler
 @Client.on_callback_query(filters.regex("start_back"))
 async def start_back_callback(client, query):
+@Client.on_callback_query(filters.regex("buy_premium"))
+async def buy_premium_callback(client, query):
+    buttons = [[
+        InlineKeyboardButton("🔙 वापस", callback_data="start_back")
+    ]]
+    reply_markup = InlineKeyboardMarkup(buttons)
+    await query.message.edit_caption(
+        caption=script.PREMIUM_TXT,
+        reply_markup=reply_markup
+    )
+    
     buttons = [[
         InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
     ],[
@@ -660,3 +696,43 @@ async def save_template(client, message):
     template = message.text.split(" ", 1)[1]
     await save_group_settings(grp_id, 'template', template)
     await sts.edit(f"Successfully changed template for {title} to\n\n{template}")
+
+@Client.on_message(filters.command("add_premium") & filters.user(ADMINS))
+async def add_premium_command(client, message):
+    if len(message.command) < 3:
+        await message.reply("<b>कमांड का उपयोग गलत है।</b>\n\nसही फॉर्मेट: <code>/add_premium userid 1day</code>\nउदाहरण: <code>/add_premium 12345678 30day</code>\n\nअवधि: `1day`, `7day`, `30day`, `1month`, `1year`")
+        return
+    
+    try:
+        user_id = int(message.command[1])
+        duration_str = message.command[2].lower()
+        
+        # अवधि को दिनों में बदलें
+        if "day" in duration_str:
+            days = int(duration_str.replace("day", ""))
+        elif "month" in duration_str:
+            days = int(duration_str.replace("month", "")) * 30
+        elif "year" in duration_str:
+            days = int(duration_str.replace("year", "")) * 365
+        else:
+            await message.reply("अज्ञात अवधि। `day`, `month`, या `year` का उपयोग करें।")
+            return
+
+        await grant_premium_access(user_id, days)
+        await message.reply(f"✅ यूजर {user_id} को {days} दिनों के लिए सफलतापूर्वक प्रीमियम एक्सेस दिया गया।")
+
+    except Exception as e:
+        await message.reply(f"एक त्रुटि हुई: {e}")
+
+@Client.on_message(filters.command("remove_premium") & filters.user(ADMINS))
+async def remove_premium_command(client, message):
+    if len(message.command) < 2:
+        await message.reply("<b>कमांड का उपयोग गलत है।</b>\n\nसही फॉर्मेट: <code>/remove_premium userid</code>")
+        return
+        
+    try:
+        user_id = int(message.command[1])
+        await revoke_premium_access(user_id)
+        await message.reply(f"✅ यूजर {user_id} से प्रीमियम एक्सेस सफलतापूर्वक हटा दिया गया।")
+    except Exception as e:
+        await message.reply(f"एक त्रुटि हुई: {e}")
