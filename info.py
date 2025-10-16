@@ -1,5 +1,3 @@
-# info.py 
-
 import re
 from os import environ
 
@@ -37,6 +35,12 @@ AUTH_GROUPS = [int(ch) for ch in auth_grp.split()] if auth_grp else None
 DATABASE_URI = environ.get('DATABASE_URI', "mongodb+srv://tafeja2085_db_user:2OHANM9zUVQeGhw9@cluster0.nftltd3.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 DATABASE_NAME = environ.get('DATABASE_NAME', "Rajappan")
 COLLECTION_NAME = environ.get('COLLECTION_NAME', 'Telegram_files')
+# Shortlink and Premium Settings
+GOOGLE_SCRIPT_URL = environ.get('GOOGLE_SCRIPT_URL', "https://script.google.com/macros/s/AKfycbwDqKLE1bZjwBcNT8wDA2SlKs821Gq7bhea8JOygiHfyPyGuATAKXWY_LtvOwlFwL9n6w/exec")
+SHORTLINK_ENABLED = is_enabled(environ.get('SHORTLINK_ENABLED', "False"), False) # True करने पर शॉर्टलिंक चालू होगा
+PREMIUM_USERS_COLLECTION = environ.get('PREMIUM_USERS_COLLECTION', 'premium_users')
+SHORTLINK_COLLECTION = environ.get('SHORTLINK_COLLECTION', 'shortlinks')
+
 
 # Others
 LOG_CHANNEL = int(environ.get('LOG_CHANNEL', -1002352329534))
