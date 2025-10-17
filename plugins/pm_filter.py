@@ -1,33 +1,28 @@
-# Kanged From @TroJanZheX
+# pm_filter.py 
+
 import asyncio
 import re
 import ast
 import math
-import time
-import uuid
-import random
-import logging
-
 from pyrogram.errors.exceptions.bad_request_400 import MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty
 from Script import script
 import pyrogram
-from database.connections_mdb import active_connection, all_connections, delete_connection, if_active, make_active, make_inactive
-from info import ADMINS, AUTH_CHANNEL, AUTH_USERS, CUSTOM_FILE_CAPTION, AUTH_GROUPS, P_TTI_SHOW_OFF, IMDB, SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE, PICS, SHORTLINK_ENABLED, GOOGLE_SCRIPT_URL
+from database.connections_mdb import active_connection, all_connections, delete_connection, if_active, make_active, \
+    make_inactive
+from info import ADMINS, AUTH_CHANNEL, AUTH_USERS, CUSTOM_FILE_CAPTION, AUTH_GROUPS, P_TTI_SHOW_OFF, IMDB, \
+    SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE, VERIFICATION_REQUIRED, VERIFICATION_DAILY, BLOGGER_REDIRECT_URL, VERIFY_BUTTON_TEXT, BUY_PREMIUM_TEXT
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait, UserIsBlocked, MessageNotModified, PeerIdInvalid
 from utils import get_size, is_subscribed, get_poster, search_gagala, temp, get_settings, save_group_settings
-from database.users_chats_db import db # यह db Database क्लास का इंस्टेंस है
+from database.users_chats_db import db
 from database.ia_filterdb import Media, get_file_details, get_search_results
 from database.filters_mdb import (
     del_all,
     find_filter,
     get_filters,
 )
-
-# **--- यहाँ सही बदलाव किया गया है ---**
-# आपकी फाइल का नाम 'users_chats_db.py' है, इसलिए इंपोर्ट 'database.users_chats_db' से होगा।
-from database.users_chats_db import check_if_premium, save_shortlink, get_shortlink, delete_shortlink 
+import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
@@ -35,17 +30,9 @@ logger.setLevel(logging.ERROR)
 BUTTONS = {}
 SPELL_CHECK = {}
 
+# New sticker ID and bot username (as per your request)
 SEARCHING_STICKER = "CAACAgUAAxkBAAEEaHpo6o_5KBv3tkax9p9ZUJ3I2D95KAACBAADwSQxMYnlHW4Ls8gQHgQ"
 BOT_PM_USERNAME = "As_freefilterBot"
-SHORTLINK_EXPIRY_TIME = 600 # 10 minutes (600 seconds)
-
-async def schedule_delete(message, delay_seconds=300):
-    """Deletes the message after a specified delay."""
-    await asyncio.sleep(delay_seconds)
-    try:
-        await message.delete()
-    except Exception as e:
-        logger.warning(f"Error deleting message: {e}")
 
 
 @Client.on_message(filters.group & filters.text & filters.incoming)
@@ -63,6 +50,7 @@ async def give_filter(client, message):
             await sticker_message.delete()
         except:
             pass # Sticker might be deleted already if it was a manual filter with a file
+
 
 @Client.on_callback_query(filters.regex(r"^next"))
 async def next_page(bot, query):
@@ -87,40 +75,31 @@ async def next_page(bot, query):
     if not files:
         return
     settings = await get_settings(query.message.chat.id)
-    
-    # --- Shortlink/Premium Logic in Next Page ---
-    user_id = query.from_user.id
-    is_premium = await check_if_premium(user_id)
-    use_shortlink = SHORTLINK_ENABLED and not is_premium
-    
-    btn = []
-    if use_shortlink:
-        # Shortlink buttons
-        for file in files:
-            token = str(uuid.uuid4())
-            # **--- यहाँ बदलाव किया गया है ---**
-            # अब save_shortlink का इस्तेमाल कर रहे हैं
-            await save_shortlink(token, file.file_id) 
-            redirect_url = f"{GOOGLE_SCRIPT_URL}?token={token}"
-            btn.append([InlineKeyboardButton(f"🔗 {file.file_name}", url=redirect_url)])
+    if settings['button']:
+        btn = [
+            [
+                # Added file emoji and size in single button mode
+                InlineKeyboardButton(
+                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'files#{file.file_id}'
+                ),
+            ]
+            for file in files
+        ]
     else:
-        # Direct file buttons (Premium or Shortlink Disabled)
-        pre = 'filep' if settings.get('file_secure') else 'file'
-        if settings['button']:
-            btn.extend([
-                [InlineKeyboardButton(text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'{pre}#{file.file_id}')]
-                for file in files
-            ])
-        else:
-            btn.extend([
-                [
-                    InlineKeyboardButton(text=f"{file.file_name}", callback_data=f'{pre}#{file.file_id}'),
-                    InlineKeyboardButton(text=f"📁 {get_size(file.file_size)}", callback_data=f'{pre}#{file.file_id}')
-                ]
-                for file in files
-            ])
-    # --- End Shortlink/Premium Logic in Next Page ---
-    
+        btn = [
+            [
+                InlineKeyboardButton(
+                    text=f"{file.file_name}", callback_data=f'files#{file.file_id}'
+                ),
+                # Added file emoji in size button
+                InlineKeyboardButton(
+                    text=f"📁 {get_size(file.file_size)}",
+                    callback_data=f'files_#{file.file_id}',
+                ),
+            ]
+            for file in files
+        ]
+
     if 0 < offset <= 10:
         off_set = 0
     elif offset == 0:
@@ -161,6 +140,7 @@ async def next_page(bot, query):
     except MessageNotModified:
         pass
     await query.answer()
+
 
 @Client.on_callback_query(filters.regex(r"^spolling"))
 async def advantage_spoll_choker(bot, query):
@@ -407,9 +387,19 @@ async def cb_handler(client: Client, query: CallbackQuery):
             alert = alert.replace("\\n", "\n").replace("\\t", "\t")
             await query.answer(alert, show_alert=True)
             
-    # START OF THE CORRECTED CODE BLOCK
+    # NEW: Verification check for file access
     elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
+        
+        # VERIFICATION CHECK
+        user_id = query.from_user.id
+        needs_verification = await check_verification_required(user_id, query.message.chat.id)
+        
+        if needs_verification:
+            await query.answer("Please verify first to access files!", show_alert=True)
+            await show_verification_message(client, query.message, user_id)
+            return
+            
         files_ = await get_file_details(file_id)
         if not files_:
             return await query.answer('No such file exist.')
@@ -464,8 +454,12 @@ Hello,
             )
             
             # Schedule deletion of the file and warning in PM
-            asyncio.create_task(schedule_delete(pm_message, 300))
-            asyncio.create_task(schedule_delete(warning_msg, 300))
+            await asyncio.sleep(300) 
+            try:
+                await pm_message.delete()
+                await warning_msg.delete()
+            except Exception:
+                pass
             
             # If file sending is successful, show the success pop-up in the group
             group_notification = "✅ फ़ाइल आपके PM (प्राइवेट मैसेज) में भेज दी गई है।\n\n✅ File has been sent to your PM."
@@ -482,12 +476,20 @@ Hello,
             logger.exception(e)
             await query.answer(f"An error occurred: {e}", show_alert=True)
             
-    # END OF THE CORRECTED CODE BLOCK
-
     elif query.data.startswith("checksub"):
         if AUTH_CHANNEL and not await is_subscribed(client, query):
             await query.answer("I Like Your Smartness, But Don't Be Oversmart 😒", show_alert=True)
             return
+            
+        # VERIFICATION CHECK
+        user_id = query.from_user.id
+        needs_verification = await check_verification_required(user_id, query.message.chat.id)
+        
+        if needs_verification:
+            await query.answer("Please verify first to access files!", show_alert=True)
+            await show_verification_message(client, query.message, user_id)
+            return
+            
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
         if not files_:
@@ -534,8 +536,12 @@ Hello,
         )
         
         # Delete PM file and warning message after 5 minutes
-        asyncio.create_task(schedule_delete(pm_message, 300))
-        asyncio.create_task(schedule_delete(warning_msg, 300))
+        await asyncio.sleep(300) 
+        try:
+            await pm_message.delete()
+            await warning_msg.delete()
+        except Exception:
+            pass
         
     elif query.data == "pages":
         await query.answer()
@@ -751,256 +757,123 @@ Hello,
             await query.message.edit_reply_markup(reply_markup)
     await query.answer('Piracy Is Crime')
 
-# --- MODIFIED: Start command with 10-minute token expiry logic ---
 
-@Client.on_message(filters.command("start") & filters.incoming)
-async def start(client, message):
-    if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
-        buttons = [
-            [InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')],
-            [InlineKeyboardButton('ℹ️ Help', url=f"https://t.me/{temp.U_NAME}?start=help")]
+# NEW: Verification System Functions
+async def check_verification_required(user_id, chat_id):
+    """Check if user needs verification"""
+    from info import VERIFICATION_REQUIRED, ADMINS
+    
+    if not VERIFICATION_REQUIRED:
+        return False
+        
+    if str(user_id) in ADMINS:
+        return False
+        
+    # Check premium status
+    premium_status = await db.get_premium_status(user_id)
+    if premium_status.get('is_premium'):
+        return False
+        
+    # Check daily verification (you'll need to implement this in database)
+    # For now, assuming all non-premium users need verification
+    return True
+
+async def show_verification_message(client, message, user_id):
+    """Show verification required message with buttons"""
+    from info import BLOGGER_REDIRECT_URL, VERIFY_BUTTON_TEXT, BUY_PREMIUM_TEXT
+    
+    verification_msg = """
+🔒 **VERIFICATION REQUIRED**
+
+आपको फ़ाइल प्राप्त करने के लिए verify होना आवश्यक है।
+
+**✅ VERIFICATION BENEFITS:**
+• 24 घंटे के लिए unlimited access
+• सभी files प्राप्त करें
+• No restrictions
+
+**💰 PREMIUM BENEFITS:**
+• No verification required
+• Direct file access
+• Priority support
+"""
+
+    buttons = [
+        [
+            InlineKeyboardButton(
+                VERIFY_BUTTON_TEXT, 
+                url=BLOGGER_REDIRECT_URL
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                BUY_PREMIUM_TEXT,
+                callback_data="buy_premium"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "❌ CLOSE",
+                callback_data="close_data"
+            )
         ]
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await message.reply(script.START_TXT.format(message.from_user.mention if message.from_user else message.chat.title, temp.U_NAME, temp.B_NAME), reply_markup=reply_markup)
-        return
-
-    if not await db.is_user_exist(message.from_user.id):
-        await db.add_user(message.from_user.id, message.from_user.first_name)
-        # Note: LOG_CHANNEL is assumed to be defined elsewhere (e.g., in info.py)
-        # Assuming LOG_CHANNEL is defined or you can remove this log part if not needed
-        # await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
-
-    # --- शॉर्टलिंक से रीडायरेक्ट होने वाले यूजर्स के लिए लॉजिक ---
-    if len(message.command) > 1 and message.command[1].startswith("download_"):
-        token = message.command[1].split("_")[1]
-        # **--- यहाँ बदलाव किया गया है ---**
-        # अब get_shortlink का इस्तेमाल कर रहे हैं
-        file_info = await get_shortlink(token) 
-
-        if file_info:
-            file_id = file_info.get("file_id")
-            token_timestamp = file_info.get("timestamp")
-
-            try:
-                time_difference = time.time() - token_timestamp.timestamp()
-            except AttributeError:
-                # Handle case where token_timestamp is not a datetime object (though it should be)
-                time_difference = 0 
-            
-            if time_difference > SHORTLINK_EXPIRY_TIME:
-                # **--- यहाँ बदलाव किया गया है ---**
-                # अब delete_shortlink का इस्तेमाल कर रहे हैं
-                await delete_shortlink(token) 
-                return await message.reply("यह डाउनलोड लिंक **समय सीमा से बाहर** (Expired) हो गया है। कृपया बॉट में फिर से फ़ाइल खोजें।")
-
-            files_ = await get_file_details(file_id)
-            if not files_:
-                return await message.reply('फ़ाइल मौजूद नहीं है।')
-
-            file = files_[0]
-            f_caption = file.caption or f"{file.file_name}"
-            
-            try:
-                sent_msg = await client.send_cached_media(
-                    chat_id=message.from_user.id,
-                    file_id=file_id,
-                    caption=f_caption
-                )
-                
-                # Send PM warning message
-                pm_warning_message = """
-Hello,
-
-⚠️ᴛʜɪs ғɪʟᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ᴀғᴛᴇʀ 5 ᴍɪɴᴜᴛᴇs
-
-ᴘʟᴇᴀsᴇ ғᴏʀᴡᴀʀᴅ ᴛʜᴇ ғɪʟᴇ sᴏᴍᴇᴡʜᴇʀᴇ ʙᴇғᴏʀᴇ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ..
-
-मूवी यहां डाउनलोड ना करे क्योंकि | मूवी 🍿 5 Minutes में डिलीट कर दी जायेगी
-कृपया कही फॉरवर्ड करे के डाउनलोड करे
-"""
-                warning_msg = await client.send_message(
-                    chat_id=message.from_user.id,
-                    text=pm_warning_message,
-                    reply_to_message_id=sent_msg.id
-                )
-                
-                # Schedule deletion of the file and warning in PM
-                asyncio.create_task(schedule_delete(sent_msg, 300))
-                asyncio.create_task(schedule_delete(warning_msg, 300))
-                
-                # Finally delete the token after successful sending
-                await delete_shortlink(token)
-
-            except Exception as e:
-                logger.error(e)
-                await message.reply("फ़ाइल भेजने में कोई त्रुटि हुई।")
-        else:
-            await message.reply("यह डाउनलोड लिंक **अमान्य** या **समाप्त** हो गया है।")
-        return
-        
-    # --- सामान्य /start कमांड लॉजिक --- (बाकी कोड जैसा का तैसा)
+    ]
     
-    if len(message.command) != 2:
-        buttons = [[
-            InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
-        ],[
-            InlineKeyboardButton('✨ Buy Premium ✨', callback_data='buy_premium'),
-            InlineKeyboardButton('😊 ᴀʙᴏᴜᴛ', callback_data='about')
-        ],[
-            InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
-            InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇs', url='https://t.me/asbhai_bsr')
-        ]]
-        reply_markup = InlineKeyboardMarkup(buttons)
-        # Note: PICS is assumed to be defined elsewhere (e.g., in info.py)
-        await message.reply_photo(
-            photo=random.choice(PICS),
-            caption=script.START_TXT.format(message.from_user.mention, temp.U_NAME, temp.B_NAME),
-            reply_markup=reply_markup,
-            parse_mode=enums.ParseMode.HTML
-        )
-        return
-        
-    # --- Deep Link and File ID Lookup Logic ---
-    if message.command[1].lower() == "help":
-        buttons = [[
-            InlineKeyboardButton('Manual Filter', callback_data='manuelfilter'),
-            InlineKeyboardButton('Auto Filter', callback_data='autofilter')
-        ], [
-            InlineKeyboardButton('Connection', callback_data='coct'),
-            InlineKeyboardButton('Extra Mods', callback_data='extra')
-        ], [
-            InlineKeyboardButton('🏠 Home', callback_data='start'),
-            InlineKeyboardButton('🔮 Status', callback_data='stats')
-        ]]
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await message.reply_text(
-            text=script.HELP_TXT.format(message.from_user.mention),
-            reply_markup=reply_markup,
-            parse_mode=enums.ParseMode.HTML
-        )
-        return
-        
-    # Check for file deep link format
-    # The file deep link format is assumed to be 'file_[file_id]' or 'filep_[file_id]'
-    # We must handle both 'file' and 'filep' as part of the check
-    if "_" not in message.command[1]:
-        # Handle start parameters that are not file IDs or help/subscribe
-        return
+    await message.reply_text(
+        verification_msg,
+        reply_markup=InlineKeyboardMarkup(buttons),
+        reply_to_message_id=message.id
+    )
 
-    # Assuming the format is 'ident_file_id' (e.g., 'file_ABC', 'filep_XYZ', 'subscribe')
-    ident, file_id = message.command[1].split("_", 1)
-    
-    if message.command[1] == "subscribe":
-        # Subscription button for AUTH_CHANNEL
-        buttons = [[
-            InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
-        ]]
-        if AUTH_CHANNEL:
-            try:
-                # Note: AUTH_CHANNEL is assumed to be defined elsewhere (e.g., in info.py)
-                invite_link = await client.create_chat_invite_link(AUTH_CHANNEL)
-                buttons.append([InlineKeyboardButton("Join Channel", url=invite_link.invite_link)])
-            except Exception as e:
-                logger.error(f"Error creating invite link: {e}")
-        
-        buttons.append([InlineKeyboardButton('🏠 Home', callback_data='start')])
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await message.reply_text("You must join the channel to use this bot's functions.", reply_markup=reply_markup)
-        return
+async def mark_user_verified(user_id):
+    """Mark user as verified for 24 hours"""
+    # Implement your verification logic here
+    # This could be storing verification time in database
+    pass
 
-    files_ = await get_file_details(file_id)
-    if not files_:
-        await message.reply('No such file exist.')
-        return
-        
-    files = files_[0]
-    title = files.file_name
-    size = get_size(files.file_size)
-    f_caption = files.caption
-    
-    if CUSTOM_FILE_CAPTION:
-        try:
-            f_caption = CUSTOM_FILE_CAPTION.format(file_name='' if title is None else title,
-                                                   file_size='' if size is None else size,
-                                                   file_caption='' if f_caption is None else f_caption)
-        except Exception as e:
-            logger.exception(e)
-        f_caption = f_caption
-    if f_caption is None:
-        f_caption = f"{files.file_name}"
-        
-    if AUTH_CHANNEL and not await is_subscribed(client, message):
-        # If user is not subscribed, send the subscribe button
-        buttons = [[
-            InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
-        ]]
-        try:
-            invite_link = await client.create_chat_invite_link(AUTH_CHANNEL)
-            buttons.append([InlineKeyboardButton("Join Channel", url=invite_link.invite_link)])
-        except Exception as e:
-            logger.error(f"Error creating invite link: {e}")
-
-        buttons.append([InlineKeyboardButton('🏠 Home', callback_data='start')])
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await message.reply_text("You must join the channel to get this file.", reply_markup=reply_markup)
-        return
-        
-    # --- File Sending Logic (for deep link) ---
-    try:
-        sent_msg = await client.send_cached_media(
-            chat_id=message.from_user.id,
-            file_id=file_id,
-            caption=f_caption,
-            protect_content=True if ident == "filep" else False
-        )
-        
-        # Send PM warning message
-        pm_warning_message = """
-Hello,
-
-⚠️ᴛʜɪs ғɪʟᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ᴀғᴛᴇʀ 5 ᴍɪɴᴜᴛᴇs
-
-ᴘʟᴇᴀsᴇ ғᴏʀᴡᴀʀᴅ ᴛʜᴇ ғɪʟᴇ sᴏᴍᴇᴡʜᴇʀᴇ ʙᴇғᴏʀᴇ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ..
-
-मूवी यहां डाउनलोड ना करे क्योंकि | मूवी 🍿 5 Minutes में डिलीट कर दी जायेगी
-कृपया कही फॉरवर्ड करे के डाउनलोड करे
-"""
-        warning_msg = await client.send_message(
-            chat_id=message.from_user.id,
-            text=pm_warning_message,
-            reply_to_message_id=sent_msg.id
-        )
-        
-        # Schedule deletion of the file and warning in PM
-        asyncio.create_task(schedule_delete(sent_msg, 300))
-        asyncio.create_task(schedule_delete(warning_msg, 300))
-        
-    except Exception as e:
-        logger.error(e)
-        await message.reply("फ़ाइल भेजने में कोई त्रुटि हुई।")
-        
+# Added sticker_msg argument, is_spellcheck_result argument
 async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_spellcheck_result=False):
-    # Use the original message object correctly
+    # Determine the message object to use
     message = msg.message.reply_to_message if is_spellcheck_result else msg
+    
+    # VERIFICATION CHECK - NEW CODE ADDED HERE
+    user_id = msg.from_user.id if msg.from_user else None
+    if user_id:
+        # Check if user needs verification
+        needs_verification = await check_verification_required(user_id, message.chat.id)
+        if needs_verification:
+            # Delete sticker if exists
+            if sticker_msg:
+                try:
+                    await sticker_msg.delete()
+                except:
+                    pass
+            
+            # Show verification message
+            await show_verification_message(client, message, user_id)
+            return
     
     if not spoll:
         settings = await get_settings(message.chat.id)
-        if message.text.startswith("/") or re.findall("((^\/|^,|^!|^\.|^[\U0001F600-\U000E007F]).*)", message.text):
-            if sticker_msg: await sticker_msg.delete()
+        if message.text.startswith("/"): 
+            if sticker_msg: await sticker_msg.delete() # delete sticker if it's a command
+            return  # ignore commands
+        if re.findall("((^\/|^,|^!|^\.|^[\U0001F600-\U000E007F]).*)", message.text):
+            if sticker_msg: await sticker_msg.delete() # delete sticker if it's not a search query
             return
-        if not (2 < len(message.text) < 100):
+        if 2 < len(message.text) < 100:
+            search = message.text
+            files, offset, total_results = await get_search_results(search.lower(), offset=0, filter=True)
+            
+            # Delete sticker immediately after getting search results
             if sticker_msg: 
-                try: await sticker_msg.delete()
-                except: pass
-            return
-        
-        search = message.text
-        files, offset, total_results = await get_search_results(search.lower(), offset=0, filter=True)
-        if sticker_msg: 
-            try: await sticker_msg.delete()
-            except: pass
-        
-        not_found_msg = """
+                try:
+                    await sticker_msg.delete() 
+                except:
+                    pass
+            
+            # Custom not found message
+            not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
 SORRY, we haven't find your file. Maybe you made a mistake? Please try to write correctly 😊 
@@ -1009,89 +882,211 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 
 Search other bot - @asfilter_bot
 """
-        if not files:
-            if settings["spell_check"]:
-                return await advantage_spell_chok(msg)
-            else:
-                k = await msg.reply(not_found_msg)
-                await asyncio.sleep(120)
-                try: await k.delete()
-                except: pass
-                return
-    else:
-        settings = await get_settings(message.chat.id)
-        search, files, offset, total_results = spoll
 
-    # --- प्रीमियम और शॉर्टलिंक लॉजिक यहाँ से शुरू होता है ---
-    user_id = message.from_user.id if message.from_user else 0 # Ensure user_id is set
-    is_premium = await check_if_premium(user_id)
-    use_shortlink = SHORTLINK_ENABLED and not is_premium
-
-    btn = []
-    if use_shortlink:
-        # शॉर्टलिंक का उपयोग करें
-        for file in files:
-            token = str(uuid.uuid4())
-            # **--- यहाँ बदलाव किया गया है ---**
-            # अब save_shortlink का इस्तेमाल कर रहे हैं
-            await save_shortlink(token, file.file_id) 
-            redirect_url = f"{GOOGLE_SCRIPT_URL}?token={token}"
-            btn.append([InlineKeyboardButton(f"🔗 {file.file_name}", url=redirect_url)])
-    else:
-        # डायरेक्ट फाइल भेजें (प्रीमियम यूजर्स या जब शॉर्टलिंक बंद हो)
-        pre = 'filep' if settings.get('file_secure') else 'file'
-        if settings.get("button"):
-            btn.extend([[InlineKeyboardButton(f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'{pre}#{file.file_id}')] for file in files])
+            if not files:
+                if settings["spell_check"]:
+                    # Pass the original message for spell check
+                    return await advantage_spell_chok(msg)
+                else:
+                    # Send custom not found message (Fix: Ensure this shows if spell check is off and no results)
+                    k = await msg.reply(not_found_msg)
+                    # Delete message after 2 minutes (120 seconds)
+                    await asyncio.sleep(120)
+                    try:
+                        await k.delete()
+                    except Exception:
+                        pass
+                    return
         else:
-            btn.extend([[InlineKeyboardButton(text=f"{file.file_name}", callback_data=f'{pre}#{file.file_id}'), InlineKeyboardButton(text=f"📁 {get_size(file.file_size)}", callback_data=f'{pre}#{file.file_id}')] for file in files])
+            if sticker_msg: 
+                try:
+                    await sticker_msg.delete() # delete sticker if query is too short/long
+                except:
+                    pass
+            return
+    else:
+        # If it's a result from spell check, sticker should be deleted already.
+        settings = await get_settings(message.chat.id) # Use the correct message object (original message)
+        search, files, offset, total_results = spoll
+        
+    pre = 'filep' if settings['file_secure'] else 'file'
+    if settings["button"]:
+        btn = [
+            [
+                InlineKeyboardButton(
+                    # Added file emoji and size in single button mode
+                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'{pre}#{file.file_id}'
+                ),
+            ]
+            for file in files
+        ]
+    else:
+        btn = [
+            [
+                InlineKeyboardButton(
+                    text=f"{file.file_name}",
+                    callback_data=f'{pre}#{file.file_id}',
+                ),
+                InlineKeyboardButton(
+                    # Added file emoji in size button
+                    text=f"📁 {get_size(file.file_size)}",
+                    callback_data=f'{pre}#{file.file_id}',
+                ),
+            ]
+            for file in files
+        ]
+
+    # Add PM button
+    pm_button = [InlineKeyboardButton("👉 ᴄʜᴇᴄᴋ ʙᴏᴛ ᴘᴍ 👈", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
     if offset != "":
         key = f"{message.chat.id}-{message.id}"
         BUTTONS[key] = search
-        req = message.from_user.id or 0
-        btn.append([InlineKeyboardButton(text=f"🗓 1/{math.ceil(total_results/10)}", callback_data="pages"), InlineKeyboardButton(text="NEXT ⏩", callback_data=f"next_{req}_{key}_{offset}")])
+        req = message.from_user.id if message.from_user else 0
+        btn.append(
+            [InlineKeyboardButton(text=f"🗓 1/{math.ceil(int(total_results) / 10)}", callback_data="pages"),
+             InlineKeyboardButton(text="NEXT ⏩", callback_data=f"next_{req}_{key}_{offset}")]
+        )
     else:
-        btn.append([InlineKeyboardButton(text="🗓 1/1", callback_data="pages")])
+        btn.append(
+            [InlineKeyboardButton(text="🗓 1/1", callback_data="pages")]
+        )
     
-    imdb = await get_poster(search, file=files[0].file_name) if settings.get("imdb") else None
+    # Add PM button to the last row
+    btn.append(pm_button) 
+
+    imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
     
+    # Custom Caption setup
     try:
         req_by = message.from_user.mention
     except:
         req_by = "User"
+    try:
+        group_title = message.chat.title
+    except:
+        group_title = "Group"
         
+    # The new result message template
     custom_caption = f"""
 📂 ʜᴇʀᴇ ɪ ꜰᴏᴜɴᴅ ꜰᴏʀ ʏᴏᴜʀ sᴇᴀʀᴄʜ - **{search}**
 
 📢 ʀᴇǫᴜᴇꜱᴛᴇᴅ ʙʏ - {req_by}
+♾️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ - {group_title}
+
+🍿 Your Movie Files 👇
 """
-    if use_shortlink:
-        custom_caption += "\n\n*वेरिफिकेशन पूरा करके फ़ाइल डाउनलोड करें।*"
-    else:
-        custom_caption += "\n\n🍿 Your Movie Files 👇"
-
-    if imdb and imdb.get('poster'):
-        await message.reply_photo(photo=imdb['poster'], caption=custom_caption, reply_markup=InlineKeyboardMarkup(btn))
-    else:
-        await message.reply_text(custom_caption, reply_markup=InlineKeyboardMarkup(btn))
-
-    if is_spellcheck_result:
-        try: await msg.message.delete()
-        except: pass
     
-    if not settings["spell_check"]:
-        return 
+    TEMPLATE = settings.get('template', IMDB_TEMPLATE) # Fallback to IMDB_TEMPLATE if 'template' is not set
+    
+    if imdb:
+        cap = TEMPLATE.format(
+            query=search,
+            title=imdb['title'],
+            votes=imdb['votes'],
+            aka=imdb["aka"],
+            seasons=imdb["seasons"],
+            box_office=imdb['box_office'],
+            localized_title=imdb['localized_title'],
+            kind=imdb['kind'],
+            imdb_id=imdb["imdb_id"],
+            cast=imdb["cast"],
+            runtime=imdb["runtime"],
+            countries=imdb["countries"],
+            certificates=imdb["certificates"],
+            languages=imdb["languages"],
+            director=imdb["director"],
+            writer=imdb["writer"],
+            producer=imdb["producer"],
+            composer=imdb["composer"],
+            cinematographer=imdb["cinematographer"],
+            music_team=imdb["music_team"],
+            distributors=imdb["distributors"],
+            release_date=imdb['release_date'],
+            year=imdb['year'],
+            genres=imdb['genres'],
+            poster=imdb['poster'],
+            plot=imdb['plot'],
+            rating=imdb['rating'],
+            url=imdb['url'],
+            **locals()
+        )
+        # Prepend custom header to IMDB caption
+        cap = custom_caption + "\n" + cap
         
+    else:
+        # Use custom header for non-IMDB caption
+        cap = custom_caption
+        
+    
+    
+    if imdb and imdb.get('poster'):
+        try:
+            # Send photo and then delete the result message after 5 minutes
+            result_msg = await message.reply_photo(photo=imdb.get('poster'), caption=cap[:1024],
+                                      reply_markup=InlineKeyboardMarkup(btn))
+            
+            await asyncio.sleep(300) 
+            try:
+                await result_msg.delete()
+            except Exception:
+                pass
+            
+        except (MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty):
+            pic = imdb.get('poster')
+            poster = pic.replace('.jpg', "._V1_UX360.jpg")
+            # Send photo and then delete the result message after 5 minutes
+            result_msg = await message.reply_photo(photo=poster, caption=cap[:1024], reply_markup=InlineKeyboardMarkup(btn))
+            
+            await asyncio.sleep(300) 
+            try:
+                await result_msg.delete()
+            except Exception:
+                pass
+            
+        except Exception as e:
+            logger.exception(e)
+            # Send text and then delete the result message after 5 minutes
+            result_msg = await message.reply_text(cap, reply_markup=InlineKeyboardMarkup(btn))
+            
+            await asyncio.sleep(300) 
+            try:
+                await result_msg.delete()
+            except Exception:
+                pass
+            
+    else:
+        # Send text and then delete the result message after 5 minutes
+        result_msg = await message.reply_text(cap, reply_markup=InlineKeyboardMarkup(btn))
+        
+        await asyncio.sleep(300) 
+        try:
+            await result_msg.delete()
+        except Exception:
+            pass
+        
+        
+    if is_spellcheck_result:
+        # Delete the spell-check message (the one showing the options) if it was a result from a callback query
+        try:
+            await msg.message.delete()
+        except Exception:
+            pass
+
+
+async def advantage_spell_chok(msg):
+    
     processing_msg = await msg.reply_text('🧐 **Checking spelling...** Please wait ⏳')
     
     query = re.sub(
         r"\b(pl(i|e)*?(s|z+|ease|se|ese|(e+)s(e)?)|((send|snd|giv(e)?|gib)(\sme)?)|movie(s)?|new|latest|br((o|u)h?)*|^h(e|a)?(l)*(o)*|mal(ayalam)?|t(h)?amil|file|that|find|und(o)*|kit(t(i|y)?)?o(w)?|thar(u)?(o)*w?|kittum(o)*|aya(k)*(um(o)*)?|full\smovie|any(one)|with\ssubtitle(s)?)",
-        "", message.text, flags=re.IGNORECASE)
+        "", msg.text, flags=re.IGNORECASE)  # plis contribute some common words
     query = query.strip() + " movie"
     g_s = await search_gagala(query)
-    g_s += await search_gagala(message.text)
+    g_s += await search_gagala(msg.text)
     gs_parsed = []
     
+    # Custom not found message
     not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -1102,6 +1097,7 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 Search other bot - @asfilter_bot
 """
     
+    # Fix 1: Stop and send not found message if no google search results
     if not g_s:
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
@@ -1111,31 +1107,32 @@ Search other bot - @asfilter_bot
             pass
         return
         
-    regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)
+    regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)  # look for imdb / wiki results
     gs = list(filter(regex.match, g_s))
     gs_parsed = [re.sub(
         r'\b(\-([a-zA-Z-\s])\-\simdb|(\-\s)?imdb|(\-\s)?wikipedia|\(|\)|\-|reviews|full|all|episode(s)?|film|movie|series)',
         '', i, flags=re.IGNORECASE) for i in gs]
     if not gs_parsed:
         reg = re.compile(r"watch(\s[a-zA-Z0-9_\s\-\(\)]*)*\|.*",
-                         re.IGNORECASE)
+                         re.IGNORECASE)  # match something like Watch Niram | Amazon Prime
         for mv in g_s:
             match = reg.match(mv)
             if match:
                 gs_parsed.append(match.group(1))
-    user = message.from_user.id if message.from_user else 0
+    user = msg.from_user.id if msg.from_user else 0
     movielist = []
-    gs_parsed = list(dict.fromkeys(gs_parsed))
+    gs_parsed = list(dict.fromkeys(gs_parsed))  # removing duplicates https://stackoverflow.com/a/7961425
     if len(gs_parsed) > 3:
         gs_parsed = gs_parsed[:3]
     if gs_parsed:
         for mov in gs_parsed:
-            imdb_s = await get_poster(mov.strip(), bulk=True)
+            imdb_s = await get_poster(mov.strip(), bulk=True)  # searching each keyword in imdb
             if imdb_s:
                 movielist += [movie.get('title') for movie in imdb_s]
     movielist += [(re.sub(r'(\-|\(|\)|_)', '', i, flags=re.IGNORECASE)).strip() for i in gs_parsed]
-    movielist = list(dict.fromkeys(movielist))
+    movielist = list(dict.fromkeys(movielist))  # removing duplicates
     
+    # Fix 1: Stop and send not found message if no movie suggestions found
     if not movielist:
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
@@ -1145,7 +1142,7 @@ Search other bot - @asfilter_bot
             pass
         return
         
-    SPELL_CHECK[message.id] = movielist
+    SPELL_CHECK[msg.id] = movielist
     btn = [[
         InlineKeyboardButton(
             text=movie.strip(),
@@ -1154,83 +1151,7 @@ Search other bot - @asfilter_bot
     ] for k, movie in enumerate(movielist)]
     btn.append([InlineKeyboardButton(text="❌ ᴄʟᴏsᴇ sᴘᴇʟʟ ᴄʜᴇᴄᴋ ❌", callback_data=f'spolling#{user}#close_spellcheck')])
     
-    await processing_msg.edit_text("🤔 ɪ ᴄᴏᴜʟᴅɴ'ᴛ ꜰɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\n\n**ᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏꜰ ᴛʜᴇsᴇ?**",
-                                    reply_markup=InlineKeyboardMarkup(btn))
-
-
-async def advantage_spell_chok(message):
-    processing_msg = await message.reply_text('🧐 **Checking spelling...** Please wait ⏳')
-    
-    query = re.sub(
-        r"\b(pl(i|e)*?(s|z+|ease|se|ese|(e+)s(e)?)|((send|snd|giv(e)?|gib)(\sme)?)|movie(s)?|new|latest|br((o|u)h?)*|^h(e|a)?(l)*(o)*|mal(ayalam)?|t(h)?amil|file|that|find|und(o)*|kit(t(i|y)?)?o(w)?|thar(u)?(o)*w?|kittum(o)*|aya(k)*(um(o)*)?|full\smovie|any(one)|with\ssubtitle(s)?)",
-        "", message.text, flags=re.IGNORECASE)
-    query = query.strip() + " movie"
-    g_s = await search_gagala(query)
-    g_s += await search_gagala(message.text)
-    gs_parsed = []
-    
-    not_found_msg = """
-क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
-
-SORRY, we haven't find your file. Maybe you made a mistake? Please try to write correctly 😊 
-
-●■●■●■●■●■●■●■
-
-Search other bot - @asfilter_bot
-"""
-    
-    if not g_s:
-        final_msg = await processing_msg.edit_text(not_found_msg)
-        await asyncio.sleep(120)
-        try:
-            await final_msg.delete()
-        except Exception:
-            pass
-        return
-        
-    regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)
-    gs = list(filter(regex.match, g_s))
-    gs_parsed = [re.sub(
-        r'\b(\-([a-zA-Z-\s])\-\simdb|(\-\s)?imdb|(\-\s)?wikipedia|\(|\)|\-|reviews|full|all|episode(s)?|film|movie|series)',
-        '', i, flags=re.IGNORECASE) for i in gs]
-    if not gs_parsed:
-        reg = re.compile(r"watch(\s[a-zA-Z0-9_\s\-\(\)]*)*\|.*",
-                         re.IGNORECASE)
-        for mv in g_s:
-            match = reg.match(mv)
-            if match:
-                gs_parsed.append(match.group(1))
-    user = message.from_user.id if message.from_user else 0
-    movielist = []
-    gs_parsed = list(dict.fromkeys(gs_parsed))
-    if len(gs_parsed) > 3:
-        gs_parsed = gs_parsed[:3]
-    if gs_parsed:
-        for mov in gs_parsed:
-            imdb_s = await get_poster(mov.strip(), bulk=True)
-            if imdb_s:
-                movielist += [movie.get('title') for movie in imdb_s]
-    movielist += [(re.sub(r'(\-|\(|\)|_)', '', i, flags=re.IGNORECASE)).strip() for i in gs_parsed]
-    movielist = list(dict.fromkeys(movielist))
-    
-    if not movielist:
-        final_msg = await processing_msg.edit_text(not_found_msg)
-        await asyncio.sleep(120)
-        try:
-            await final_msg.delete()
-        except Exception:
-            pass
-        return
-        
-    SPELL_CHECK[message.id] = movielist
-    btn = [[
-        InlineKeyboardButton(
-            text=movie.strip(),
-            callback_data=f"spolling#{user}#{k}",
-        )
-    ] for k, movie in enumerate(movielist)]
-    btn.append([InlineKeyboardButton(text="❌ ᴄʟᴏsᴇ sᴘᴇʟʟ ᴄʜᴇᴄᴋ ❌", callback_data=f'spolling#{user}#close_spellcheck')])
-    
+    # Edit the processing message to show the spell check options
     await processing_msg.edit_text("🤔 ɪ ᴄᴏᴜʟᴅɴ'ᴛ ꜰɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\n\n**ᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏꜰ ᴛʜᴇsᴇ?**",
                                     reply_markup=InlineKeyboardMarkup(btn))
 
@@ -1291,7 +1212,11 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
                         )
                         
                     # Delete the result message after 5 minutes (300 seconds)
-                    asyncio.create_task(schedule_delete(result_msg, 300))
+                    await asyncio.sleep(300) 
+                    try:
+                        await result_msg.delete()
+                    except Exception:
+                        pass
                     
                 except Exception as e:
                     logger.exception(e)
