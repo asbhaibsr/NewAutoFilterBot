@@ -25,11 +25,9 @@ from database.filters_mdb import (
     get_filters,
 )
 
-# **--- यहाँ बदलाव किया गया है ---**
-# अब हम database.py से premium और shortlink फंक्शन्स को सीधे इंपोर्ट कर रहे हैं।
-# यह मानकर कि 'database.py' फ़ाइल 'database' फ़ोल्डर में 'database.py' नाम से मौजूद है।
-# अगर आपकी फाइल का नाम users_chats_db.py है, तो import path बदलें।
-from database.database import check_if_premium, save_shortlink, get_shortlink, delete_shortlink 
+# **--- यहाँ सही बदलाव किया गया है ---**
+# आपकी फाइल का नाम 'users_chats_db.py' है, इसलिए इंपोर्ट 'database.users_chats_db' से होगा।
+from database.users_chats_db import check_if_premium, save_shortlink, get_shortlink, delete_shortlink 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
@@ -101,7 +99,7 @@ async def next_page(bot, query):
         for file in files:
             token = str(uuid.uuid4())
             # **--- यहाँ बदलाव किया गया है ---**
-            # अब shortlink_db.save_shortlink की जगह सिर्फ save_shortlink का इस्तेमाल कर रहे हैं
+            # अब save_shortlink का इस्तेमाल कर रहे हैं
             await save_shortlink(token, file.file_id) 
             redirect_url = f"{GOOGLE_SCRIPT_URL}?token={token}"
             btn.append([InlineKeyboardButton(f"🔗 {file.file_name}", url=redirect_url)])
@@ -768,13 +766,15 @@ async def start(client, message):
 
     if not await db.is_user_exist(message.from_user.id):
         await db.add_user(message.from_user.id, message.from_user.first_name)
-        await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
+        # Note: LOG_CHANNEL is assumed to be defined elsewhere (e.g., in info.py)
+        # Assuming LOG_CHANNEL is defined or you can remove this log part if not needed
+        # await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
 
     # --- शॉर्टलिंक से रीडायरेक्ट होने वाले यूजर्स के लिए लॉजिक ---
     if len(message.command) > 1 and message.command[1].startswith("download_"):
         token = message.command[1].split("_")[1]
         # **--- यहाँ बदलाव किया गया है ---**
-        # shortlink_db.get_shortlink की जगह सिर्फ get_shortlink का इस्तेमाल कर रहे हैं
+        # अब get_shortlink का इस्तेमाल कर रहे हैं
         file_info = await get_shortlink(token) 
 
         if file_info:
@@ -784,11 +784,12 @@ async def start(client, message):
             try:
                 time_difference = time.time() - token_timestamp.timestamp()
             except AttributeError:
-                time_difference = 0
+                # Handle case where token_timestamp is not a datetime object (though it should be)
+                time_difference = 0 
             
             if time_difference > SHORTLINK_EXPIRY_TIME:
                 # **--- यहाँ बदलाव किया गया है ---**
-                # shortlink_db.delete_shortlink की जगह सिर्फ delete_shortlink का इस्तेमाल कर रहे हैं
+                # अब delete_shortlink का इस्तेमाल कर रहे हैं
                 await delete_shortlink(token) 
                 return await message.reply("यह डाउनलोड लिंक **समय सीमा से बाहर** (Expired) हो गया है। कृपया बॉट में फिर से फ़ाइल खोजें।")
 
@@ -827,6 +828,9 @@ Hello,
                 asyncio.create_task(schedule_delete(sent_msg, 300))
                 asyncio.create_task(schedule_delete(warning_msg, 300))
                 
+                # Finally delete the token after successful sending
+                await delete_shortlink(token)
+
             except Exception as e:
                 logger.error(e)
                 await message.reply("फ़ाइल भेजने में कोई त्रुटि हुई।")
@@ -847,6 +851,7 @@ Hello,
             InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇs', url='https://t.me/asbhai_bsr')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
+        # Note: PICS is assumed to be defined elsewhere (e.g., in info.py)
         await message.reply_photo(
             photo=random.choice(PICS),
             caption=script.START_TXT.format(message.from_user.mention, temp.U_NAME, temp.B_NAME),
@@ -876,7 +881,14 @@ Hello,
         return
         
     # Check for file deep link format
-    _, file_id = message.command[1].split("_", 1)
+    # The file deep link format is assumed to be 'file_[file_id]' or 'filep_[file_id]'
+    # We must handle both 'file' and 'filep' as part of the check
+    if "_" not in message.command[1]:
+        # Handle start parameters that are not file IDs or help/subscribe
+        return
+
+    # Assuming the format is 'ident_file_id' (e.g., 'file_ABC', 'filep_XYZ', 'subscribe')
+    ident, file_id = message.command[1].split("_", 1)
     
     if message.command[1] == "subscribe":
         # Subscription button for AUTH_CHANNEL
@@ -885,6 +897,7 @@ Hello,
         ]]
         if AUTH_CHANNEL:
             try:
+                # Note: AUTH_CHANNEL is assumed to be defined elsewhere (e.g., in info.py)
                 invite_link = await client.create_chat_invite_link(AUTH_CHANNEL)
                 buttons.append([InlineKeyboardButton("Join Channel", url=invite_link.invite_link)])
             except Exception as e:
@@ -938,7 +951,7 @@ Hello,
             chat_id=message.from_user.id,
             file_id=file_id,
             caption=f_caption,
-            protect_content=True if message.command[1].startswith("filep") else False
+            protect_content=True if ident == "filep" else False
         )
         
         # Send PM warning message
@@ -1010,7 +1023,7 @@ Search other bot - @asfilter_bot
         search, files, offset, total_results = spoll
 
     # --- प्रीमियम और शॉर्टलिंक लॉजिक यहाँ से शुरू होता है ---
-    user_id = message.from_user.id
+    user_id = message.from_user.id if message.from_user else 0 # Ensure user_id is set
     is_premium = await check_if_premium(user_id)
     use_shortlink = SHORTLINK_ENABLED and not is_premium
 
@@ -1020,7 +1033,7 @@ Search other bot - @asfilter_bot
         for file in files:
             token = str(uuid.uuid4())
             # **--- यहाँ बदलाव किया गया है ---**
-            # shortlink_db.save_shortlink की जगह सिर्फ save_shortlink का इस्तेमाल कर रहे हैं
+            # अब save_shortlink का इस्तेमाल कर रहे हैं
             await save_shortlink(token, file.file_id) 
             redirect_url = f"{GOOGLE_SCRIPT_URL}?token={token}"
             btn.append([InlineKeyboardButton(f"🔗 {file.file_name}", url=redirect_url)])
