@@ -1,6 +1,18 @@
-# https://github.com/odysseusmax/animated-lamp/blob/master/bot/database/database.py
 import motor.motor_asyncio
-from info import DATABASE_NAME, DATABASE_URI, IMDB, IMDB_TEMPLATE, MELCOW_NEW_USERS, P_TTI_SHOW_OFF, SINGLE_BUTTON, SPELL_CHECK_REPLY, PROTECT_CONTENT
+import datetime
+from info import (
+    DATABASE_NAME, 
+    DATABASE_URI, 
+    IMDB, 
+    IMDB_TEMPLATE, 
+    MELCOW_NEW_USERS, 
+    P_TTI_SHOW_OFF, 
+    SINGLE_BUTTON, 
+    SPELL_CHECK_REPLY, 
+    PROTECT_CONTENT,
+    PREMIUM_USERS_COLLECTION, 
+    SHORTLINK_COLLECTION
+)
 
 class Database:
     
@@ -144,9 +156,6 @@ class Database:
 
 
 db = Database(DATABASE_URI, DATABASE_NAME)
-
-import datetime
-from info import DATABASE_NAME, PREMIUM_USERS_COLLECTION, SHORTLINK_COLLECTION
 
 # प्रीमियम यूजर्स के लिए कलेक्शन
 premium_users_col = db._client[DATABASE_NAME][PREMIUM_USERS_COLLECTION]
