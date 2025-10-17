@@ -3,36 +3,33 @@ import asyncio
 import re
 import ast
 import math
-import time  # <--- NEW: Added for time tracking and expiry check
+import time
+import uuid
+import random
+import logging
+
 from pyrogram.errors.exceptions.bad_request_400 import MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty
 from Script import script
 import pyrogram
-from database.connections_mdb import active_connection, all_connections, delete_connection, if_active, make_active, \
-    make_inactive
-from info import ADMINS, AUTH_CHANNEL, AUTH_USERS, CUSTOM_FILE_CAPTION, AUTH_GROUPS, P_TTI_SHOW_OFF, IMDB, \
-    SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE, PICS
+from database.connections_mdb import active_connection, all_connections, delete_connection, if_active, make_active, make_inactive
+from info import ADMINS, AUTH_CHANNEL, AUTH_USERS, CUSTOM_FILE_CAPTION, AUTH_GROUPS, P_TTI_SHOW_OFF, IMDB, SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE, PICS, SHORTLINK_ENABLED, GOOGLE_SCRIPT_URL
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait, UserIsBlocked, MessageNotModified, PeerIdInvalid
 from utils import get_size, is_subscribed, get_poster, search_gagala, temp, get_settings, save_group_settings
-from database.users_chats_db import db
+from database.users_chats_db import db # यह db Database क्लास का इंस्टेंस है
 from database.ia_filterdb import Media, get_file_details, get_search_results
 from database.filters_mdb import (
     del_all,
     find_filter,
     get_filters,
 )
-import logging
-import uuid
-import random
-from info import SHORTLINK_ENABLED, GOOGLE_SCRIPT_URL
-# from database.users_chats_db import check_if_premium, save_shortlink # Assuming check_if_premium and save_shortlink are imported correctly
 
-# Since check_if_premium and save_shortlink were likely meant to be imported from ia_filterdb or a custom db file.
-# I am using the existing imports for consistency and hoping db object works for shortlink functions too,
-# but using the imports you provided in the original database.py for better safety (assuming they are correctly defined).
-from database.ia_filterdb import db as shortlink_db # Re-importing db as shortlink_db for clarity, though it might be the same object
-from database.users_chats_db import check_if_premium # Re-importing premium check
+# **--- यहाँ बदलाव किया गया है ---**
+# अब हम database.py से premium और shortlink फंक्शन्स को सीधे इंपोर्ट कर रहे हैं।
+# यह मानकर कि 'database.py' फ़ाइल 'database' फ़ोल्डर में 'database.py' नाम से मौजूद है।
+# अगर आपकी फाइल का नाम users_chats_db.py है, तो import path बदलें।
+from database.database import check_if_premium, save_shortlink, get_shortlink, delete_shortlink 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
@@ -40,12 +37,10 @@ logger.setLevel(logging.ERROR)
 BUTTONS = {}
 SPELL_CHECK = {}
 
-# New sticker ID and bot username (as per your request)
 SEARCHING_STICKER = "CAACAgUAAxkBAAEEaHpo6o_5KBv3tkax9p9ZUJ3I2D95KAACBAADwSQxMYnlHW4Ls8gQHgQ"
 BOT_PM_USERNAME = "As_freefilterBot"
-SHORTLINK_EXPIRY_TIME = 600 # 10 minutes (600 seconds) <--- NEW: Token Expiry Time
+SHORTLINK_EXPIRY_TIME = 600 # 10 minutes (600 seconds)
 
-# MODIFIED: यह फंक्शन अब किसी भी मैसेज को दिए गए समय के बाद डिलीट कर सकता है
 async def schedule_delete(message, delay_seconds=300):
     """Deletes the message after a specified delay."""
     await asyncio.sleep(delay_seconds)
@@ -70,8 +65,6 @@ async def give_filter(client, message):
             await sticker_message.delete()
         except:
             pass # Sticker might be deleted already if it was a manual filter with a file
-
-# --- cb_handler and other functions remain the same ---
 
 @Client.on_callback_query(filters.regex(r"^next"))
 async def next_page(bot, query):
@@ -107,8 +100,9 @@ async def next_page(bot, query):
         # Shortlink buttons
         for file in files:
             token = str(uuid.uuid4())
-            # Assuming save_shortlink is defined in database/ia_filterdb or similar imported file
-            await shortlink_db.save_shortlink(token, file.file_id) 
+            # **--- यहाँ बदलाव किया गया है ---**
+            # अब shortlink_db.save_shortlink की जगह सिर्फ save_shortlink का इस्तेमाल कर रहे हैं
+            await save_shortlink(token, file.file_id) 
             redirect_url = f"{GOOGLE_SCRIPT_URL}?token={token}"
             btn.append([InlineKeyboardButton(f"🔗 {file.file_name}", url=redirect_url)])
     else:
@@ -779,24 +773,24 @@ async def start(client, message):
     # --- शॉर्टलिंक से रीडायरेक्ट होने वाले यूजर्स के लिए लॉजिक ---
     if len(message.command) > 1 and message.command[1].startswith("download_"):
         token = message.command[1].split("_")[1]
-        file_info = await shortlink_db.get_shortlink(token) # shortlink_db is an alias for db or an object with get_shortlink
+        # **--- यहाँ बदलाव किया गया है ---**
+        # shortlink_db.get_shortlink की जगह सिर्फ get_shortlink का इस्तेमाल कर रहे हैं
+        file_info = await get_shortlink(token) 
 
         if file_info:
             file_id = file_info.get("file_id")
-            token_timestamp = file_info.get("timestamp") # डेटाबेस से timestamp लिया
+            token_timestamp = file_info.get("timestamp")
 
-            # timestamp को seconds में बदलें और चेक करें कि 10 मिनट (SHORTLINK_EXPIRY_TIME) से ज्यादा समय तो नहीं हुआ?
             try:
                 time_difference = time.time() - token_timestamp.timestamp()
             except AttributeError:
-                # Fallback for old/bad database entries (treat as not expired)
                 time_difference = 0
             
             if time_difference > SHORTLINK_EXPIRY_TIME:
-                await shortlink_db.delete_shortlink(token) # 10 मिनट से ज्यादा हो गया, अब डिलीट कर दो
+                # **--- यहाँ बदलाव किया गया है ---**
+                # shortlink_db.delete_shortlink की जगह सिर्फ delete_shortlink का इस्तेमाल कर रहे हैं
+                await delete_shortlink(token) 
                 return await message.reply("यह डाउनलोड लिंक **समय सीमा से बाहर** (Expired) हो गया है। कृपया बॉट में फिर से फ़ाइल खोजें।")
-
-            # टोकन Expired नहीं हुआ है, आगे बढ़ो
 
             files_ = await get_file_details(file_id)
             if not files_:
@@ -972,9 +966,6 @@ Hello,
         logger.error(e)
         await message.reply("फ़ाइल भेजने में कोई त्रुटि हुई।")
         
-# --- auto_filter and manual_filter functions remain the same (with minor cleanup) ---
-
-# Added sticker_msg argument, is_spellcheck_result argument
 async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_spellcheck_result=False):
     # Use the original message object correctly
     message = msg.message.reply_to_message if is_spellcheck_result else msg
@@ -1028,7 +1019,9 @@ Search other bot - @asfilter_bot
         # शॉर्टलिंक का उपयोग करें
         for file in files:
             token = str(uuid.uuid4())
-            await shortlink_db.save_shortlink(token, file.file_id) # shortlink_db is an alias for db
+            # **--- यहाँ बदलाव किया गया है ---**
+            # shortlink_db.save_shortlink की जगह सिर्फ save_shortlink का इस्तेमाल कर रहे हैं
+            await save_shortlink(token, file.file_id) 
             redirect_url = f"{GOOGLE_SCRIPT_URL}?token={token}"
             btn.append([InlineKeyboardButton(f"🔗 {file.file_name}", url=redirect_url)])
     else:
@@ -1073,22 +1066,19 @@ Search other bot - @asfilter_bot
         try: await msg.message.delete()
         except: pass
     
-    # --- Spell Check Logic --- (moved to a separate function for clarity if needed, but keeping it inside auto_filter for consistency)
-    
     if not settings["spell_check"]:
-        return # Do not continue if spell check is disabled
+        return 
         
     processing_msg = await msg.reply_text('🧐 **Checking spelling...** Please wait ⏳')
     
     query = re.sub(
         r"\b(pl(i|e)*?(s|z+|ease|se|ese|(e+)s(e)?)|((send|snd|giv(e)?|gib)(\sme)?)|movie(s)?|new|latest|br((o|u)h?)*|^h(e|a)?(l)*(o)*|mal(ayalam)?|t(h)?amil|file|that|find|und(o)*|kit(t(i|y)?)?o(w)?|thar(u)?(o)*w?|kittum(o)*|aya(k)*(um(o)*)?|full\smovie|any(one)|with\ssubtitle(s)?)",
-        "", message.text, flags=re.IGNORECASE)  # plis contribute some common words
+        "", message.text, flags=re.IGNORECASE)
     query = query.strip() + " movie"
     g_s = await search_gagala(query)
     g_s += await search_gagala(message.text)
     gs_parsed = []
     
-    # Custom not found message
     not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -1099,7 +1089,6 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 Search other bot - @asfilter_bot
 """
     
-    # Fix 1: Stop and send not found message if no google search results
     if not g_s:
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
@@ -1109,32 +1098,31 @@ Search other bot - @asfilter_bot
             pass
         return
         
-    regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)  # look for imdb / wiki results
+    regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)
     gs = list(filter(regex.match, g_s))
     gs_parsed = [re.sub(
         r'\b(\-([a-zA-Z-\s])\-\simdb|(\-\s)?imdb|(\-\s)?wikipedia|\(|\)|\-|reviews|full|all|episode(s)?|film|movie|series)',
         '', i, flags=re.IGNORECASE) for i in gs]
     if not gs_parsed:
         reg = re.compile(r"watch(\s[a-zA-Z0-9_\s\-\(\)]*)*\|.*",
-                         re.IGNORECASE)  # match something like Watch Niram | Amazon Prime
+                         re.IGNORECASE)
         for mv in g_s:
             match = reg.match(mv)
             if match:
                 gs_parsed.append(match.group(1))
     user = message.from_user.id if message.from_user else 0
     movielist = []
-    gs_parsed = list(dict.fromkeys(gs_parsed))  # removing duplicates https://stackoverflow.com/a/7961425
+    gs_parsed = list(dict.fromkeys(gs_parsed))
     if len(gs_parsed) > 3:
         gs_parsed = gs_parsed[:3]
     if gs_parsed:
         for mov in gs_parsed:
-            imdb_s = await get_poster(mov.strip(), bulk=True)  # searching each keyword in imdb
+            imdb_s = await get_poster(mov.strip(), bulk=True)
             if imdb_s:
                 movielist += [movie.get('title') for movie in imdb_s]
     movielist += [(re.sub(r'(\-|\(|\)|_)', '', i, flags=re.IGNORECASE)).strip() for i in gs_parsed]
-    movielist = list(dict.fromkeys(movielist))  # removing duplicates
+    movielist = list(dict.fromkeys(movielist))
     
-    # Fix 1: Stop and send not found message if no movie suggestions found
     if not movielist:
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
@@ -1153,21 +1141,16 @@ Search other bot - @asfilter_bot
     ] for k, movie in enumerate(movielist)]
     btn.append([InlineKeyboardButton(text="❌ ᴄʟᴏsᴇ sᴘᴇʟʟ ᴄʜᴇᴄᴋ ❌", callback_data=f'spolling#{user}#close_spellcheck')])
     
-    # Edit the processing message to show the spell check options
     await processing_msg.edit_text("🤔 ɪ ᴄᴏᴜʟᴅɴ'ᴛ ꜰɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\n\n**ᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏꜰ ᴛʜᴇsᴇ?**",
                                     reply_markup=InlineKeyboardMarkup(btn))
 
 
-# advantage_spell_chok is missing, but auto_filter handles the logic now. Keeping this placeholder just in case.
 async def advantage_spell_chok(message):
-    # This function is not defined in the provided code, but auto_filter handles the logic.
-    # We will put the original spell check code here just to make the call from auto_filter work.
-    
     processing_msg = await message.reply_text('🧐 **Checking spelling...** Please wait ⏳')
     
     query = re.sub(
         r"\b(pl(i|e)*?(s|z+|ease|se|ese|(e+)s(e)?)|((send|snd|giv(e)?|gib)(\sme)?)|movie(s)?|new|latest|br((o|u)h?)*|^h(e|a)?(l)*(o)*|mal(ayalam)?|t(h)?amil|file|that|find|und(o)*|kit(t(i|y)?)?o(w)?|thar(u)?(o)*w?|kittum(o)*|aya(k)*(um(o)*)?|full\smovie|any(one)|with\ssubtitle(s)?)",
-        "", message.text, flags=re.IGNORECASE)  # plis contribute some common words
+        "", message.text, flags=re.IGNORECASE)
     query = query.strip() + " movie"
     g_s = await search_gagala(query)
     g_s += await search_gagala(message.text)
