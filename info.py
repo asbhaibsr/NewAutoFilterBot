@@ -1,3 +1,5 @@
+# info.py
+
 import re
 from os import environ
 
@@ -35,12 +37,6 @@ AUTH_GROUPS = [int(ch) for ch in auth_grp.split()] if auth_grp else None
 DATABASE_URI = environ.get('DATABASE_URI', "mongodb+srv://tafeja2085_db_user:2OHANM9zUVQeGhw9@cluster0.nftltd3.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 DATABASE_NAME = environ.get('DATABASE_NAME', "Rajappan")
 COLLECTION_NAME = environ.get('COLLECTION_NAME', 'Telegram_files')
-# Shortlink and Premium Settings
-GOOGLE_SCRIPT_URL = environ.get('GOOGLE_SCRIPT_URL', "https://script.google.com/macros/s/AKfycbwDqKLE1bZjwBcNT8wDA2SlKs821Gq7bhea8JOygiHfyPyGuATAKXWY_LtvOwlFwL9n6w/exec")
-SHORTLINK_ENABLED = is_enabled(environ.get('SHORTLINK_ENABLED', "True"), True) # True करने पर शॉर्टलिंक चालू होगा
-PREMIUM_USERS_COLLECTION = environ.get('PREMIUM_USERS_COLLECTION', 'premium_users')
-SHORTLINK_COLLECTION = environ.get('SHORTLINK_COLLECTION', 'shortlinks')
-
 
 # Others
 LOG_CHANNEL = int(environ.get('LOG_CHANNEL', -1002352329534))
@@ -59,6 +55,21 @@ FILE_STORE_CHANNEL = [int(ch) for ch in (environ.get('FILE_STORE_CHANNEL', '-100
 MELCOW_NEW_USERS = is_enabled((environ.get('MELCOW_NEW_USERS', "True")), True)
 PROTECT_CONTENT = is_enabled((environ.get('PROTECT_CONTENT', "False")), False)
 PUBLIC_FILE_STORE = is_enabled((environ.get('PUBLIC_FILE_STORE', "True")), True)
+
+# Verification System Only Google Blogger Website
+VERIFICATION_REQUIRED = is_enabled((environ.get('VERIFICATION_REQUIRED', "True")), True)
+VERIFICATION_DAILY = is_enabled((environ.get('VERIFICATION_DAILY', "True")), True)
+BLOGGER_REDIRECT_URL = environ.get('BLOGGER_REDIRECT_URL', 'https://script.google.com/macros/s/AKfycbwDqKLE1bZjwBcNT8wDA2SlKs821Gq7bhea8JOygiHfyPyGuATAKXWY_LtvOwlFwL9n6w/exec')
+VERIFY_BUTTON_TEXT = environ.get('VERIFY_BUTTON_TEXT', '✅ VERIFY NOW')
+BUY_PREMIUM_TEXT = environ.get('BUY_PREMIUM_TEXT', '💰 BUY PREMIUM')
+
+# Premium Plans
+PREMIUM_PLANS = {
+    '1day': 86400,      # 1 day in seconds
+    '1month': 2592000,  # 30 days in seconds  
+    '1year': 31536000   # 365 days in seconds
+}
+
 # Start AsfreefilterBot  
 
 LOG_STR = "Current Cusomized Configurations are:-\n"
@@ -70,3 +81,4 @@ LOG_STR += ("Long IMDB storyline enabled." if LONG_IMDB_DESCRIPTION else "LONG_I
 LOG_STR += ("Spell Check Mode Is Enabled, bot will be suggesting related movies if movie not found\n" if SPELL_CHECK_REPLY else "SPELL_CHECK_REPLY Mode disabled\n")
 LOG_STR += (f"MAX_LIST_ELM Found, long list will be shortened to first {MAX_LIST_ELM} elements\n" if MAX_LIST_ELM else "Full List of casts and crew will be shown in imdb template, restrict them by adding a value to MAX_LIST_ELM\n")
 LOG_STR += f"Your current IMDB template is {IMDB_TEMPLATE}"
+LOG_STR += f"\nVerification System: {'Enabled' if VERIFICATION_REQUIRED else 'Disabled'}"
