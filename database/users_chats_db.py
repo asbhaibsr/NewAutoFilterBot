@@ -1,18 +1,9 @@
+# users_chats_db.py 
+
+# https://github.com/odysseusmax/animated-lamp/blob/master/bot/database/database.py
 import motor.motor_asyncio
-import datetime
-from info import (
-    DATABASE_NAME, 
-    DATABASE_URI, 
-    IMDB, 
-    IMDB_TEMPLATE, 
-    MELCOW_NEW_USERS, 
-    P_TTI_SHOW_OFF, 
-    SINGLE_BUTTON, 
-    SPELL_CHECK_REPLY, 
-    PROTECT_CONTENT,
-    PREMIUM_USERS_COLLECTION, 
-    SHORTLINK_COLLECTION
-)
+from datetime import datetime, timedelta
+from info import DATABASE_NAME, DATABASE_URI, IMDB, IMDB_TEMPLATE, MELCOW_NEW_USERS, P_TTI_SHOW_OFF, SINGLE_BUTTON, SPELL_CHECK_REPLY, PROTECT_CONTENT
 
 class Database:
     
@@ -31,6 +22,16 @@ class Database:
                 is_banned=False,
                 ban_reason="",
             ),
+            verification=dict(
+                is_verified=False,
+                last_verified=None,
+            ),
+            premium=dict(
+                is_premium=False,
+                plan_type=None,
+                premium_since=None,
+                premium_expiry=None
+            )
         )
 
 
@@ -95,7 +96,95 @@ class Database:
         b_users = [user['id'] async for user in users]
         return b_users, b_chats
     
+    # Verification Methods
+    async def mark_user_verified(self, user_id):
+        """Mark user as verified for 24 hours"""
+        verification_data = {
+            'verification.is_verified': True,
+            'verification.last_verified': datetime.now()
+        }
+        await self.col.update_one(
+            {'id': user_id}, 
+            {'$set': verification_data}
+        )
+    
+    async def check_verification_status(self, user_id):
+        """Check if user is verified (within 24 hours)"""
+        user = await self.col.find_one({'id': user_id})
+        if not user:
+            return False
+            
+        verification = user.get('verification', {})
+        if verification.get('is_verified'):
+            last_verified = verification.get('last_verified')
+            if last_verified:
+                # Check if verification is within 24 hours
+                if isinstance(last_verified, datetime):
+                    time_diff = datetime.now() - last_verified
+                    if time_diff.total_seconds() < 86400:  # 24 hours
+                        return True
+                    else:
+                        # Verification expired
+                        await self.col.update_one(
+                            {'id': user_id},
+                            {'$set': {'verification.is_verified': False}}
+                        )
+        return False
 
+    # Premium Methods
+    async def add_premium_user(self, user_id, plan_type):
+        """Add user to premium"""
+        expiry_time = self.calculate_premium_expiry(plan_type)
+        premium_data = {
+            'premium.is_premium': True,
+            'premium.plan_type': plan_type,
+            'premium.premium_since': datetime.now(),
+            'premium.premium_expiry': expiry_time
+        }
+        await self.col.update_one(
+            {'id': user_id}, 
+            {'$set': premium_data},
+            upsert=True
+        )
+        return expiry_time
+
+    async def remove_premium_user(self, user_id):
+        """Remove user from premium"""
+        premium_data = {
+            'premium.is_premium': False,
+            'premium.plan_type': None,
+            'premium.premium_since': None,
+            'premium.premium_expiry': None
+        }
+        await self.col.update_one(
+            {'id': user_id}, 
+            {'$set': premium_data}
+        )
+
+    async def get_premium_status(self, user_id):
+        """Get user's premium status"""
+        user = await self.col.find_one({'id': user_id})
+        if user and user.get('premium', {}).get('is_premium'):
+            expiry = user['premium'].get('premium_expiry')
+            if expiry and expiry > datetime.now():
+                return {
+                    'is_premium': True,
+                    'plan': user['premium'].get('plan_type'),
+                    'expiry': expiry
+                }
+            else:
+                # Premium expired
+                await self.remove_premium_user(user_id)
+        return {'is_premium': False}
+
+    def calculate_premium_expiry(self, plan_type):
+        """Calculate premium expiry time"""
+        plan_durations = {
+            '1day': timedelta(days=1),
+            '1month': timedelta(days=30),
+            '1year': timedelta(days=365)
+        }
+        return datetime.now() + plan_durations.get(plan_type, timedelta(days=1))
 
     async def add_chat(self, chat, title):
         chat = self.new_group(chat, title)
@@ -156,41 +245,3 @@ class Database:
 
 
 db = Database(DATABASE_URI, DATABASE_NAME)
-
-# प्रीमियम यूजर्स के लिए कलेक्शन
-premium_users_col = db._client[DATABASE_NAME][PREMIUM_USERS_COLLECTION]
-# शॉर्टलिंक टोकन के लिए कलेक्शन
-shortlinks_col = db._client[DATABASE_NAME][SHORTLINK_COLLECTION]
-
-# प्रीमियम यूजर्स को मैनेज करने के लिए फंक्शन्स
-async def grant_premium_access(user_id: int, days: int):
-    expiry_date = datetime.datetime.now() + datetime.timedelta(days=days)
-    await premium_users_col.update_one(
-        {"_id": user_id},
-        {"$set": {"expiry_date": expiry_date}},
-        upsert=True
-    )
-
-async def revoke_premium_access(user_id: int):
-    await premium_users_col.delete_one({"_id": user_id})
-
-async def check_if_premium(user_id: int) -> bool:
-    user = await premium_users_col.find_one({"_id": user_id})
-    if user and user.get("expiry_date") and user["expiry_date"] > datetime.datetime.now():
-        return True
-    
-    # यदि यूजर का प्रीमियम समाप्त हो गया है तो उसे हटा दें
-    elif user:
-        await revoke_premium_access(user_id)
-        
-    return False
-
-# शॉर्टलिंक टोकन को मैनेज करने के लिए फंक्शन्स
-async def save_shortlink(token: str, file_id: str):
-    await shortlinks_col.insert_one({"_id": token, "file_id": file_id, "timestamp": datetime.datetime.now()})
-
-async def get_shortlink(token: str):
-    return await shortlinks_col.find_one({"_id": token})
-
-async def delete_shortlink(token: str):
-    await shortlinks_col.delete_one({"_id": token})
