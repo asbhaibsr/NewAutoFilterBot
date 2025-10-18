@@ -1,5 +1,3 @@
-# pm_filter.py 
-
 import asyncio
 import re
 import ast
@@ -387,22 +385,24 @@ async def cb_handler(client: Client, query: CallbackQuery):
             alert = alert.replace("\\n", "\n").replace("\\t", "\t")
             await query.answer(alert, show_alert=True)
             
-    # NEW: Verification check for file access
+    # ✅ बदलाव यहाँ से शुरू
     elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
         
-        # VERIFICATION CHECK
         user_id = query.from_user.id
-        needs_verification = await check_verification_required(user_id, query.message.chat.id)
+        
+        # वेरिफिकेशन की जांच
+        needs_verification = await check_verification_required(user_id)
         
         if needs_verification:
-            await query.answer("Please verify first to access files!", show_alert=True)
-            await show_verification_message(client, query.message, user_id)
+            await query.answer("फाइल पाने के लिए कृपया पहले वेरीफाई करें!", show_alert=True)
+            # file_id को वेरिफिकेशन मैसेज में भेजें
+            await show_verification_message(client, query, user_id, file_id=file_id)
             return
             
         files_ = await get_file_details(file_id)
         if not files_:
-            return await query.answer('No such file exist.')
+            return await query.answer('ऐसी कोई फ़ाइल मौजूद नहीं है।')
 
         files = files_[0]
         title = files.file_name
@@ -421,14 +421,11 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if f_caption is None:
             f_caption = f"{files.file_name}"
 
-        # Check if the user is subscribed to the AUTH_CHANNEL
         if AUTH_CHANNEL and not await is_subscribed(client, query):
-            # If not subscribed, show a pop-up with a link to the bot
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start=subscribe")
             return
             
         try:
-            # Try to send the file to the user's PM
             pm_message = await client.send_cached_media(
                 chat_id=query.from_user.id,
                 file_id=file_id,
@@ -436,7 +433,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 protect_content=True if ident == "filep" else False 
             )
             
-            # Send the warning message in PM
             pm_warning_message = """
 Hello,
 
@@ -453,7 +449,6 @@ Hello,
                 reply_to_message_id=pm_message.id
             )
             
-            # Schedule deletion of the file and warning in PM
             await asyncio.sleep(300) 
             try:
                 await pm_message.delete()
@@ -461,18 +456,14 @@ Hello,
             except Exception:
                 pass
             
-            # If file sending is successful, show the success pop-up in the group
             group_notification = "✅ फ़ाइल आपके PM (प्राइवेट मैसेज) में भेज दी गई है।\n\n✅ File has been sent to your PM."
             await query.answer(group_notification, show_alert=True)
             
         except UserIsBlocked:
-            # If the user has blocked the bot
             await query.answer('आपने बॉट को ब्लॉक किया हुआ है। कृपया अनब्लॉक करें।', show_alert=True)
         except PeerIdInvalid:
-            # If the user has not started the bot yet
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
         except Exception as e:
-            # For any other errors
             logger.exception(e)
             await query.answer(f"An error occurred: {e}", show_alert=True)
             
@@ -481,13 +472,15 @@ Hello,
             await query.answer("I Like Your Smartness, But Don't Be Oversmart 😒", show_alert=True)
             return
             
-        # VERIFICATION CHECK
         user_id = query.from_user.id
-        needs_verification = await check_verification_required(user_id, query.message.chat.id)
+
+        # वेरिफिकेशन की जांच
+        needs_verification = await check_verification_required(user_id)
         
         if needs_verification:
-            await query.answer("Please verify first to access files!", show_alert=True)
-            await show_verification_message(client, query.message, user_id)
+            await query.answer("फाइल पाने के लिए कृपया पहले वेरीफाई करें!", show_alert=True)
+            _, file_id = query.data.split("#")
+            await show_verification_message(client, query, user_id, file_id=file_id)
             return
             
         ident, file_id = query.data.split("#")
@@ -510,7 +503,6 @@ Hello,
             f_caption = f"{title}"
         await query.answer()
         
-        # Send PM file
         pm_message = await client.send_cached_media(
             chat_id=query.from_user.id,
             file_id=file_id,
@@ -518,7 +510,6 @@ Hello,
             protect_content=True if ident == 'checksubp' else False
         )
         
-        # Send separate PM message
         pm_warning_message = """
 Hello,
 
@@ -535,14 +526,14 @@ Hello,
             reply_to_message_id=pm_message.id
         )
         
-        # Delete PM file and warning message after 5 minutes
         await asyncio.sleep(300) 
         try:
             await pm_message.delete()
             await warning_msg.delete()
         except Exception:
             pass
-        
+    # ✅ बदलाव यहाँ खत्म
+            
     elif query.data == "pages":
         await query.answer()
     elif query.data == "start":
@@ -758,30 +749,38 @@ Hello,
     await query.answer('Piracy Is Crime')
 
 
-# NEW: Verification System Functions
-async def check_verification_required(user_id, chat_id):
-    """Check if user needs verification"""
+# ✅ बदलाव यहाँ से शुरू: वेरिफिकेशन सिस्टम फंक्शन
+async def check_verification_required(user_id):
+    """जांचें कि यूजर को वेरिफिकेशन की आवश्यकता है या नहीं"""
     from info import VERIFICATION_REQUIRED, ADMINS
     
+    # अगर वेरिफिकेशन बंद है, तो False लौटाएं
     if not VERIFICATION_REQUIRED:
         return False
-        
+    
+    # अगर यूजर एडमिन है, तो False लौटाएं
     if str(user_id) in ADMINS:
         return False
         
-    # Check premium status
+    # प्रीमियम स्टेटस की जांच करें
     premium_status = await db.get_premium_status(user_id)
     if premium_status.get('is_premium'):
         return False
         
-    # Check daily verification (you'll need to implement this in database)
-    # For now, assuming all non-premium users need verification
+    # 24-घंटे की वेरिफिकेशन की जांच करें
+    if await db.check_verification_status(user_id):
+        return False
+        
+    # अगर ऊपर की कोई भी शर्त पूरी नहीं होती है, तो वेरिफिकेशन की आवश्यकता है
     return True
 
-async def show_verification_message(client, message, user_id):
-    """Show verification required message with buttons"""
+async def show_verification_message(client, query, user_id, file_id=None):
+    """वेरिफिकेशन आवश्यक संदेश बटनों के साथ दिखाएं"""
     from info import BLOGGER_REDIRECT_URL, VERIFY_BUTTON_TEXT, BUY_PREMIUM_TEXT
     
+    # query.message का उपयोग करके मूल संदेश प्राप्त करें
+    message = query.message
+
     verification_msg = """
 🔒 **VERIFICATION REQUIRED**
 
@@ -797,12 +796,18 @@ async def show_verification_message(client, message, user_id):
 • Direct file access
 • Priority support
 """
+    # file_id का उपयोग करके सही वेरिफिकेशन URL बनाएं
+    if file_id:
+        verification_url = f"{BLOGGER_REDIRECT_URL}?token={file_id}"
+    else:
+        # अगर file_id नहीं है तो फॉलबैक (हालांकि फाइल अनुरोधों के लिए यह नहीं होना चाहिए)
+        verification_url = BLOGGER_REDIRECT_URL
 
     buttons = [
         [
             InlineKeyboardButton(
                 VERIFY_BUTTON_TEXT, 
-                url=BLOGGER_REDIRECT_URL
+                url=verification_url
             )
         ],
         [
@@ -819,39 +824,36 @@ async def show_verification_message(client, message, user_id):
         ]
     ]
     
+    # उत्तर के रूप में नया संदेश भेजें
     await message.reply_text(
         verification_msg,
         reply_markup=InlineKeyboardMarkup(buttons),
         reply_to_message_id=message.id
     )
-
-async def mark_user_verified(user_id):
-    """Mark user as verified for 24 hours"""
-    # Implement your verification logic here
-    # This could be storing verification time in database
-    pass
+# ✅ बदलाव यहाँ खत्म
 
 # Added sticker_msg argument, is_spellcheck_result argument
 async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_spellcheck_result=False):
     # Determine the message object to use
     message = msg.message.reply_to_message if is_spellcheck_result else msg
     
-    # VERIFICATION CHECK - NEW CODE ADDED HERE
+    # ✅ बदलाव यहाँ से शुरू
     user_id = msg.from_user.id if msg.from_user else None
     if user_id:
-        # Check if user needs verification
-        needs_verification = await check_verification_required(user_id, message.chat.id)
+        # जांचें कि क्या यूजर को वेरिफिकेशन की आवश्यकता है
+        needs_verification = await check_verification_required(user_id)
         if needs_verification:
-            # Delete sticker if exists
+            # अगर स्टिकर मौजूद है तो उसे डिलीट करें
             if sticker_msg:
                 try:
                     await sticker_msg.delete()
                 except:
                     pass
             
-            # Show verification message
+            # वेरिफिकेशन संदेश दिखाएं, query object के बजाय message object भेजें
             await show_verification_message(client, message, user_id)
             return
+    # ✅ बदलाव यहाँ खत्म
     
     if not spoll:
         settings = await get_settings(message.chat.id)
