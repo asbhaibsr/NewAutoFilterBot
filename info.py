@@ -59,7 +59,7 @@ PUBLIC_FILE_STORE = is_enabled((environ.get('PUBLIC_FILE_STORE', "True")), True)
 # Verification System Only Google Blogger Website
 VERIFICATION_REQUIRED = is_enabled((environ.get('VERIFICATION_REQUIRED', "True")), True)
 VERIFICATION_DAILY = is_enabled((environ.get('VERIFICATION_DAILY', "True")), True)
-BLOGGER_REDIRECT_URL = environ.get('BLOGGER_REDIRECT_URL', 'https://script.google.com/macros/s/AKfycbwDqKLE1bZjwBcNT8wDA2SlKs821Gq7bhea8JOygiHfyPyGuATAKXWY_LtvOwlFwL9n6w/exec')
+BLOGGER_REDIRECT_URL = environ.get('BLOGGER_REDIRECT_URL', 'https://script.google.com/macros/s/AKfycbxUKPgFev4Hku4rCworeYkXv0-qZD_nosYQ8bgZn7vua9FL0ilTqMNXTbEe-1KkHvQR5g/exec')
 VERIFY_BUTTON_TEXT = environ.get('VERIFY_BUTTON_TEXT', '✅ VERIFY NOW')
 BUY_PREMIUM_TEXT = environ.get('BUY_PREMIUM_TEXT', '💰 BUY PREMIUM')
 
