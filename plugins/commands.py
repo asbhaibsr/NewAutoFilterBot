@@ -87,19 +87,41 @@ async def start(client, message):
         await db.add_user(message.from_user.id, message.from_user.first_name)
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
         
-    # ✅ बदलाव यहाँ से शुरू
-    # जब यूजर वेबसाइट से वेरीफाई होकर वापस आता है तो उसे 24 घंटे के लिए वेरिफाइड मार्क करें
+    # ✅ FIXED: Verification completion को सही तरीके से handle करें
     if len(message.command) > 1:
         data = message.command[1]
+        
+        # Download tokens handle करें
         if data.startswith(('download_', 'download_batch_', 'secure_download_')):
             try:
-                # यूजर को वेरिफाइड मार्क करें
+                # User को verified mark करें
                 await db.mark_user_verified(message.from_user.id)
-                # यूजर को एक कन्फर्मेशन मैसेज भेजें
+                # User को confirmation message भेजें
                 await message.reply_text("✅ **Verification Successful!**\nअब आप अगले 24 घंटों के लिए बिना किसी रोक-टोक के फाइलें प्राप्त कर सकते हैं।")
+                
+                # Agar specific file ka token hai to automatically file send करें
+                if data.startswith('download_') and len(data) > len('download_'):
+                    file_token = data.replace('download_', '')
+                    # File send logic यहाँ add करें
+                    
             except Exception as e:
                 logger.error(f"Error during verification marking: {e}")
-    # ✅ बदलाव यहाँ खत्म
+        
+        # Verified completion handle करें  
+        elif data.startswith('verified_'):
+            try:
+                parts = data.split('_')
+                user_id = int(parts[1])
+                
+                # Verify that the user completing verification is the same user
+                if message.from_user.id == user_id:
+                    await db.mark_user_verified(user_id)
+                    await message.reply_text(
+                        "✅ **Verification Successful!**\n\n"
+                        "अब आप अगले 24 घंटों के लिए बिना किसी रोक-टोक के फाइलें प्राप्त कर सकते हैं।"
+                    )
+            except Exception as e:
+                logger.error(f"Error during verification completion: {e}")
         
     if len(message.command) != 2:
         buttons = [[
