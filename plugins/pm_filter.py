@@ -1,3 +1,5 @@
+# pm_filter.py (डिबगिंग कोड के साथ)
+
 import asyncio
 import re
 import ast
@@ -766,7 +768,6 @@ async def check_verification_required(user_id):
         
     return True
 
-# ✅ यहाँ बदलाव किया गया है: पूरे फंक्शन को बदला गया है
 async def show_verification_message(client, context, user_id, file_id=None):
     """वेरिफिकेशन आवश्यक संदेश बटनों के साथ दिखाएं"""
     from info import BLOGGER_REDIRECT_URL, VERIFY_BUTTON_TEXT, BUY_PREMIUM_TEXT
@@ -796,6 +797,9 @@ async def show_verification_message(client, context, user_id, file_id=None):
         verification_url = f"{BLOGGER_REDIRECT_URL}?token={file_id}"
     else:
         verification_url = BLOGGER_REDIRECT_URL
+
+    # ✅ डिबगिंग के लिए print कमांड जोड़ा गया है
+    print(f"DEBUG: Generated Verification URL: {verification_url}")
 
     buttons = [
         [
