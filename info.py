@@ -63,6 +63,7 @@ BLOGGER_REDIRECT_URL = environ.get('BLOGGER_REDIRECT_URL', 'https://script.googl
 VERIFY_BUTTON_TEXT = environ.get('VERIFY_BUTTON_TEXT', '✅ VERIFY NOW')
 BUY_PREMIUM_TEXT = environ.get('BUY_PREMIUM_TEXT', '💰 BUY PREMIUM')
 
+
 # Premium Plans
 PREMIUM_PLANS = {
     '1day': 86400,      # 1 day in seconds
