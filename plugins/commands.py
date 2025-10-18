@@ -1,5 +1,3 @@
-# commands.py
-
 import os
 import logging
 import random
@@ -88,6 +86,20 @@ async def start(client, message):
     if not await db.is_user_exist(message.from_user.id):
         await db.add_user(message.from_user.id, message.from_user.first_name)
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
+        
+    # ✅ बदलाव यहाँ से शुरू
+    # जब यूजर वेबसाइट से वेरीफाई होकर वापस आता है तो उसे 24 घंटे के लिए वेरिफाइड मार्क करें
+    if len(message.command) > 1:
+        data = message.command[1]
+        if data.startswith(('download_', 'download_batch_', 'secure_download_')):
+            try:
+                # यूजर को वेरिफाइड मार्क करें
+                await db.mark_user_verified(message.from_user.id)
+                # यूजर को एक कन्फर्मेशन मैसेज भेजें
+                await message.reply_text("✅ **Verification Successful!**\nअब आप अगले 24 घंटों के लिए बिना किसी रोक-टोक के फाइलें प्राप्त कर सकते हैं।")
+            except Exception as e:
+                logger.error(f"Error during verification marking: {e}")
+    # ✅ बदलाव यहाँ खत्म
         
     if len(message.command) != 2:
         buttons = [[
