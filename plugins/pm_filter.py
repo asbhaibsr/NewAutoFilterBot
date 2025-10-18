@@ -793,13 +793,15 @@ async def show_verification_message(client, context, user_id, file_id=None):
 • Direct file access
 • Priority support
 """
+    
+    # ✅ FIXED: सीधे BLOGGER_REDIRECT_URL का उपयोग करें (Google Script)
     if file_id:
         verification_url = f"{BLOGGER_REDIRECT_URL}?token={file_id}"
     else:
         verification_url = BLOGGER_REDIRECT_URL
 
-    # ✅ डिबगिंग के लिए print कमांड जोड़ा गया है
-    print(f"DEBUG: Generated Verification URL: {verification_url}")
+    # ✅ डिबगिंग के लिए print कमांड
+    print(f"DEBUG: User {user_id} verification URL: {verification_url}")
 
     buttons = [
         [
@@ -842,7 +844,7 @@ async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_
                 except:
                     pass
             
-            # वेरिफिकेशन संदेश दिखाएं, अब यह सही `message` ऑब्जेक्ट का उपयोग करेगा
+            # वेरिफिकेशन संदेश दिखाएं
             await show_verification_message(client, message, user_id)
             return
     
