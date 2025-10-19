@@ -866,7 +866,7 @@ Search other bot - @asfilter_bot
 📂 ʜᴇʀᴇ ɪ ꜰᴏᴜɴᴅ ꜰᴏʀ ʏᴏᴜʀ sᴇᴀʀᴄʜ - **{search}**
 
 📢 ʀᴇǫᴜᴇꜱᴛᴇᴅ ʙʏ - {req_by}
-♾️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ - {group_title}
+♾️ ᴘᴏᴡᴇᴇᴅ ʙʏ - {group_title}
 
 🍿 Your Movie Files 👇
 """
