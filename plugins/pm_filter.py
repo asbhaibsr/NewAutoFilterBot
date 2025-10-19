@@ -1,5 +1,3 @@
-# pm_filter.py 
-
 import asyncio
 import re
 import ast
@@ -527,15 +525,18 @@ Hello,
         
     elif query.data == "pages":
         await query.answer()
+        
+    # FIX: /start commands ke buttons ko commands.py ke buttons se match kiya gaya
     elif query.data == "start":
         buttons = [[
-            InlineKeyboardButton('➕ Add Me To Your Groups ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
-        ], [
-            InlineKeyboardButton('🔍 Search', switch_inline_query_current_chat=''),
-            InlineKeyboardButton('🤖 Updates', url='https://t.me/asbhai_bsr')
-        ], [
-            InlineKeyboardButton('ℹ️ Help', callback_data='help'),
-            InlineKeyboardButton('😊 About', callback_data='about')
+            InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
+        ],[
+            InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
+            InlineKeyboardButton('😊 ᴀʙᴏᴜᴛ', callback_data='about')
+        ],[
+            InlineKeyboardButton('🤖 ᴏᴛʜᴇʀ ʙᴏᴛs & ᴄᴏɴᴛᴀᴄᴛ 🤖', callback_data='other_bots_0')
+        ],[
+            InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇs', url='https://t.me/asbhai_bsr')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -544,6 +545,7 @@ Hello,
             parse_mode=enums.ParseMode.HTML
         )
         await query.answer('Piracy Is Crime')
+        
     elif query.data == "help":
         buttons = [[
             InlineKeyboardButton('Manual Filter', callback_data='manuelfilter'),
@@ -968,6 +970,7 @@ Search other bot - @asfilter_bot
 
 async def advantage_spell_chok(msg):
     
+    # FIX: Store the processing message immediately
     processing_msg = await msg.reply_text('🧐 **Checking spelling...** Please wait ⏳')
     
     query = re.sub(
@@ -989,7 +992,7 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 Search other bot - @asfilter_bot
 """
     
-    # Fix 1: Stop and send not found message if no google search results
+    # FIX 1: Stop and send not found message if no google search results
     if not g_s:
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
@@ -1024,7 +1027,7 @@ Search other bot - @asfilter_bot
     movielist += [(re.sub(r'(\-|\(|\)|_)', '', i, flags=re.IGNORECASE)).strip() for i in gs_parsed]
     movielist = list(dict.fromkeys(movielist))  # removing duplicates
     
-    # Fix 1: Stop and send not found message if no movie suggestions found
+    # FIX 2: Stop and send not found message if no movie suggestions found
     if not movielist:
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
@@ -1043,7 +1046,7 @@ Search other bot - @asfilter_bot
     ] for k, movie in enumerate(movielist)]
     btn.append([InlineKeyboardButton(text="❌ ᴄʟᴏsᴇ sᴘᴇʟʟ ᴄʜᴇᴄᴋ ❌", callback_data=f'spolling#{user}#close_spellcheck')])
     
-    # Edit the processing message to show the spell check options
+    # FIX 3: Edit the processing message to show the spell check options
     await processing_msg.edit_text("🤔 ɪ ᴄᴏᴜʟᴅɴ'ᴛ ꜰɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\n\n**ᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏꜰ ᴛʜᴇsᴇ?**",
                                     reply_markup=InlineKeyboardMarkup(btn))
 
@@ -1115,4 +1118,3 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
                 return True # Return True if manual filter was found and sent
     else:
         return False # Return False if no manual filter was found
-
