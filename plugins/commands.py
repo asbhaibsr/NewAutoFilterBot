@@ -1,5 +1,3 @@
-# commands.py
-
 import os
 import logging
 import random
@@ -369,9 +367,15 @@ async def start_back_callback(client, query):
     except Exception as e:
         logger.error(f"Error in start_back_callback: {e}")
 
-@Client.on_message(filters.private & filters.text & filters.incoming & ~filters.command(["start", "help", "settings", "id", "status", "batch", "connect", "disconnect", "stats", "set_template"]))
+@Client.on_message(
+    filters.private & 
+    filters.text & 
+    filters.incoming & 
+    ~filters.user(ADMINS) & # Admin ko exclude karein
+    ~filters.command(["start", "help", "settings", "id", "status", "batch", "connect", "disconnect", "stats", "set_template"]) # Specified commands ko exclude karein
+)
 async def pm_text_search_handler(client, message):
-    """Handles text messages in PM that are not commands, by suggesting to join the group."""
+    """Handles text messages/commands in PM that are not /start or other whitelisted commands, by suggesting to join the group."""
     
     buttons = [[
         InlineKeyboardButton('🎬 Free Movie Search Group 🍿', url='https://t.me/freemoviesearchgroup')
