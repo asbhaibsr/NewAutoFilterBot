@@ -1,4 +1,4 @@
-# info.py
+# info.py 
 
 import re
 from os import environ
@@ -55,22 +55,6 @@ FILE_STORE_CHANNEL = [int(ch) for ch in (environ.get('FILE_STORE_CHANNEL', '-100
 MELCOW_NEW_USERS = is_enabled((environ.get('MELCOW_NEW_USERS', "True")), True)
 PROTECT_CONTENT = is_enabled((environ.get('PROTECT_CONTENT', "False")), False)
 PUBLIC_FILE_STORE = is_enabled((environ.get('PUBLIC_FILE_STORE', "True")), True)
-
-# Verification System Only Google Blogger Website
-VERIFICATION_REQUIRED = is_enabled((environ.get('VERIFICATION_REQUIRED', "True")), False)
-VERIFICATION_DAILY = is_enabled((environ.get('VERIFICATION_DAILY', "True")), False)
-BLOGGER_REDIRECT_URL = environ.get('BLOGGER_REDIRECT_URL', 'https://script.google.com/macros/s/AKfycbxUKPgFev4Hku4rCworeYkXv0-qZD_nosYQ8bgZn7vua9FL0ilTqMNXTbEe-1KkHvQR5g/exec')
-VERIFY_BUTTON_TEXT = environ.get('VERIFY_BUTTON_TEXT', '✅ VERIFY NOW')
-BUY_PREMIUM_TEXT = environ.get('BUY_PREMIUM_TEXT', '💰 BUY PREMIUM')
-
-
-# Premium Plans
-PREMIUM_PLANS = {
-    '1day': 86400,      # 1 day in seconds
-    '1month': 2592000,  # 30 days in seconds  
-    '1year': 31536000   # 365 days in seconds
-}
-
 # Start AsfreefilterBot  
 
 LOG_STR = "Current Cusomized Configurations are:-\n"
@@ -82,4 +66,3 @@ LOG_STR += ("Long IMDB storyline enabled." if LONG_IMDB_DESCRIPTION else "LONG_I
 LOG_STR += ("Spell Check Mode Is Enabled, bot will be suggesting related movies if movie not found\n" if SPELL_CHECK_REPLY else "SPELL_CHECK_REPLY Mode disabled\n")
 LOG_STR += (f"MAX_LIST_ELM Found, long list will be shortened to first {MAX_LIST_ELM} elements\n" if MAX_LIST_ELM else "Full List of casts and crew will be shown in imdb template, restrict them by adding a value to MAX_LIST_ELM\n")
 LOG_STR += f"Your current IMDB template is {IMDB_TEMPLATE}"
-LOG_STR += f"\nVerification System: {'Enabled' if VERIFICATION_REQUIRED else 'Disabled'}"
