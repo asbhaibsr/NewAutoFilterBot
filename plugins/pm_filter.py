@@ -130,7 +130,6 @@ async def next_page(bot, query):
     # Add PM button to the last row
     btn.append(pm_button) 
 
-
     try:
         await query.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup(btn)
@@ -385,7 +384,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
             alert = alert.replace("\\n", "\n").replace("\\t", "\t")
             await query.answer(alert, show_alert=True)
             
-    # START OF THE CORRECTED CODE BLOCK
+    # CORRECTED FILE SENDING SECTION WITH GROUP NOTIFICATION
     elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
@@ -416,7 +415,11 @@ async def cb_handler(client: Client, query: CallbackQuery):
             return
             
         try:
-            # Try to send the file to the user's PM
+            # FIRST: Show popup message in group that file is being sent to PM
+            group_notification = "✅ फ़ाइल आपके PM में भेजी जा रही है...\n\n✅ File is being sent to your PM..."
+            await query.answer(group_notification, show_alert=True)
+            
+            # SECOND: Try to send the file to the user's PM
             pm_message = await client.send_cached_media(
                 chat_id=query.from_user.id,
                 file_id=file_id,
@@ -424,7 +427,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 protect_content=True if ident == "filep" else False 
             )
             
-            # Send the warning message in PM
+            # THIRD: Send the warning message in PM
             pm_warning_message = """
 Hello,
 
@@ -441,17 +444,24 @@ Hello,
                 reply_to_message_id=pm_message.id
             )
             
-            # Schedule deletion of the file and warning in PM
-            await asyncio.sleep(300) 
+            # FOURTH: Send success message in group that will auto-delete after 3 seconds
+            success_msg = await query.message.reply_text(
+                f"✅ फ़ाइल {query.from_user.mention} के PM में भेज दी गई है!\n\n✅ File has been sent to {query.from_user.mention}'s PM!"
+            )
+            
+            # Schedule deletion of messages
+            await asyncio.sleep(3)  # Delete group success message after 3 seconds
+            try:
+                await success_msg.delete()
+            except Exception:
+                pass
+                
+            await asyncio.sleep(297)  # Wait remaining time for PM messages (total 5 minutes)
             try:
                 await pm_message.delete()
                 await warning_msg.delete()
             except Exception:
                 pass
-            
-            # If file sending is successful, show the success pop-up in the group
-            group_notification = "✅ फ़ाइल आपके PM (प्राइवेट मैसेज) में भेज दी गई है।\n\n✅ File has been sent to your PM."
-            await query.answer(group_notification, show_alert=True)
             
         except UserIsBlocked:
             # If the user has blocked the bot
@@ -464,8 +474,6 @@ Hello,
             logger.exception(e)
             await query.answer(f"An error occurred: {e}", show_alert=True)
             
-    # END OF THE CORRECTED CODE BLOCK
-
     elif query.data.startswith("checksub"):
         if AUTH_CHANNEL and not await is_subscribed(client, query):
             await query.answer("I Like Your Smartness, But Don't Be Oversmart 😒", show_alert=True)
@@ -489,6 +497,9 @@ Hello,
         if f_caption is None:
             f_caption = f"{title}"
         await query.answer()
+        
+        # Show popup that file is being sent
+        await query.answer("✅ फ़ाइल आपके PM में भेजी जा रही है...", show_alert=True)
         
         # Send PM file
         pm_message = await client.send_cached_media(
@@ -515,8 +526,20 @@ Hello,
             reply_to_message_id=pm_message.id
         )
         
+        # Send group success message
+        success_msg = await query.message.reply_text(
+            f"✅ फ़ाइल {query.from_user.mention} के PM में भेज दी गई है!"
+        )
+        
+        # Delete group message after 3 seconds
+        await asyncio.sleep(3)
+        try:
+            await success_msg.delete()
+        except Exception:
+            pass
+        
         # Delete PM file and warning message after 5 minutes
-        await asyncio.sleep(300) 
+        await asyncio.sleep(297)
         try:
             await pm_message.delete()
             await warning_msg.delete()
