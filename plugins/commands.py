@@ -1,3 +1,5 @@
+# commands.py
+
 import os
 import logging
 import random
@@ -8,7 +10,7 @@ from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, Channel
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database.ia_filterdb import Media, get_file_details, unpack_new_file_id
 from database.users_chats_db import db
-from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT, VERIFICATION_REQUIRED, VERIFICATION_DAILY, BLOGGER_REDIRECT_URL, VERIFY_BUTTON_TEXT, BUY_PREMIUM_TEXT
+from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT
 from utils import get_settings, get_size, is_subscribed, save_group_settings, temp
 from database.connections_mdb import active_connection
 import re
@@ -86,42 +88,6 @@ async def start(client, message):
     if not await db.is_user_exist(message.from_user.id):
         await db.add_user(message.from_user.id, message.from_user.first_name)
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT_P.format(message.from_user.id, message.from_user.mention))
-        
-    # ✅ FIXED: Verification completion को सही तरीके से handle करें
-    if len(message.command) > 1:
-        data = message.command[1]
-        
-        # Download tokens handle करें
-        if data.startswith(('download_', 'download_batch_', 'secure_download_')):
-            try:
-                # User को verified mark करें
-                await db.mark_user_verified(message.from_user.id)
-                # User को confirmation message भेजें
-                await message.reply_text("✅ **Verification Successful!**\nअब आप अगले 24 घंटों के लिए बिना किसी रोक-टोक के फाइलें प्राप्त कर सकते हैं।")
-                
-                # Agar specific file ka token hai to automatically file send करें
-                if data.startswith('download_') and len(data) > len('download_'):
-                    file_token = data.replace('download_', '')
-                    # File send logic यहाँ add करें
-                    
-            except Exception as e:
-                logger.error(f"Error during verification marking: {e}")
-        
-        # Verified completion handle करें  
-        elif data.startswith('verified_'):
-            try:
-                parts = data.split('_')
-                user_id = int(parts[1])
-                
-                # Verify that the user completing verification is the same user
-                if message.from_user.id == user_id:
-                    await db.mark_user_verified(user_id)
-                    await message.reply_text(
-                        "✅ **Verification Successful!**\n\n"
-                        "अब आप अगले 24 घंटों के लिए बिना किसी रोक-टोक के फाइलें प्राप्त कर सकते हैं।"
-                    )
-            except Exception as e:
-                logger.error(f"Error during verification completion: {e}")
         
     if len(message.command) != 2:
         buttons = [[
@@ -358,7 +324,7 @@ async def other_bots_callback(client, query):
     buttons = []
     nav_buttons = []
     if page_index > 0:
-        nav_buttons.append(InlineKeyboardButton(f"⬅️ ᴘɪᴄʜʟᴀ", callback_data=f"other_bots_{page_index-1}"))
+        nav_buttons.append(InlineKeyboardButton(f"⬅️ ᴘɪᴄʜʜʟᴀ", callback_data=f"other_bots_{page_index-1}"))
     
     if page_index < len(BOTS_PAGES) - 1:
         nav_buttons.append(InlineKeyboardButton(f"ᴀɢʟᴀ ➡️", callback_data=f"other_bots_{page_index+1}"))
@@ -426,129 +392,7 @@ async def pm_text_search_handler(client, message):
         disable_web_page_preview=True,
         parse_mode=enums.ParseMode.MARKDOWN
     )
-
-# NEW: Premium Commands
-@Client.on_message(filters.command("add_premium") & filters.user(ADMINS))
-async def add_premium_user_command(client, message):
-    """Add user to premium"""
-    try:
-        if len(message.command) < 3:
-            await message.reply_text("Usage: /add_premium <user_id> <1day|1month|1year>")
-            return
-            
-        user_id = int(message.command[1])
-        plan_type = message.command[2].lower()
-        
-        if plan_type not in ['1day', '1month', '1year']:
-            await message.reply_text("Invalid plan. Use: 1day, 1month, or 1year")
-            return
-            
-        expiry_time = await db.add_premium_user(user_id, plan_type)
-        
-        # Notify user
-        try:
-            await client.send_message(
-                user_id,
-                f"🎉 **Congratulations!**\n\n"
-                f"You have been upgraded to **{plan_type}** premium plan!\n"
-                f"Expiry: {expiry_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                f"Use /myplan to check your status."
-            )
-        except:
-            pass
-            
-        await message.reply_text(
-            f"✅ User {user_id} added to {plan_type} premium plan.\n"
-            f"Expires: {expiry_time.strftime('%Y-%m-%d %H:%M:%S')}"
-        )
-        
-    except Exception as e:
-        await message.reply_text(f"Error: {str(e)}")
-
-@Client.on_message(filters.command("remove_premium") & filters.user(ADMINS))
-async def remove_premium_user_command(client, message):
-    """Remove user from premium"""
-    try:
-        if len(message.command) < 2:
-            await message.reply_text("Usage: /remove_premium <user_id>")
-            return
-            
-        user_id = int(message.command[1])
-        await db.remove_premium_user(user_id)
-        
-        # Notify user
-        try:
-            await client.send_message(
-                user_id,
-                "ℹ️ **Premium Plan Ended**\n\n"
-                "Your premium subscription has been ended."
-            )
-        except:
-            pass
-            
-        await message.reply_text(f"✅ User {user_id} removed from premium.")
-        
-    except Exception as e:
-        await message.reply_text(f"Error: {str(e)}")
-
-@Client.on_message(filters.command("myplan"))
-async def my_plan_command(client, message):
-    """Check user's premium plan"""
-    user_id = message.from_user.id
-    premium_status = await db.get_premium_status(user_id)
-    
-    if premium_status.get('is_premium'):
-        expiry = premium_status['expiry']
-        plan = premium_status['plan']
-        
-        text = (
-            f"💰 **YOUR PREMIUM PLAN**\n\n"
-            f"• Plan: **{plan.upper()}**\n"
-            f"• Expiry: `{expiry.strftime('%Y-%m-%d %H:%M:%S')}`\n"
-            f"• Status: ✅ ACTIVE\n\n"
-            f"Enjoy unlimited access! 🎉"
-        )
-    else:
-        text = (
-            "ℹ️ **YOUR CURRENT PLAN**\n\n"
-            "• Plan: **FREE USER**\n"
-            "• Verification: Required daily\n"
-            "• File Access: After verification\n\n"
-            "Upgrade to premium for direct access! 💰"
-        )
-    
-    await message.reply_text(text)
-
-# Buy premium callback handler
-@Client.on_callback_query(filters.regex("^buy_premium$"))
-async def buy_premium_callback(client, query):
-    """Handle buy premium button click"""
-    
-    premium_plans_text = """
-💰 **PREMIUM PLANS**
-
-• **1 DAY** - Basic access
-• **1 MONTH** - Full access  
-• **1 YEAR** - Ultimate access
-
-Contact @asbhai_bsr for premium plans!
-"""
-    
-    buttons = [
-        [
-            InlineKeyboardButton("📞 Contact Owner", url="https://t.me/asbhai_bsr")
-        ],
-        [
-            InlineKeyboardButton("🔙 Back", callback_data="close_data")
-        ]
-    ]
-    
-    await query.message.edit_text(
-        premium_plans_text,
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
-    await query.answer()
-
+                    
 @Client.on_message(filters.command('channel') & filters.user(ADMINS))
 async def channel_info(bot, message):
     """Send basic information of channel"""
