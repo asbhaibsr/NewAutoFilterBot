@@ -1,4 +1,4 @@
-# pm_filter.py (डिबगिंग कोड के साथ)
+# pm_filter.py 
 
 import asyncio
 import re
@@ -10,7 +10,7 @@ import pyrogram
 from database.connections_mdb import active_connection, all_connections, delete_connection, if_active, make_active, \
     make_inactive
 from info import ADMINS, AUTH_CHANNEL, AUTH_USERS, CUSTOM_FILE_CAPTION, AUTH_GROUPS, P_TTI_SHOW_OFF, IMDB, \
-    SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE, VERIFICATION_REQUIRED, VERIFICATION_DAILY, BLOGGER_REDIRECT_URL, VERIFY_BUTTON_TEXT, BUY_PREMIUM_TEXT
+    SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait, UserIsBlocked, MessageNotModified, PeerIdInvalid
@@ -387,23 +387,12 @@ async def cb_handler(client: Client, query: CallbackQuery):
             alert = alert.replace("\\n", "\n").replace("\\t", "\t")
             await query.answer(alert, show_alert=True)
             
+    # START OF THE CORRECTED CODE BLOCK
     elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
-        
-        user_id = query.from_user.id
-        
-        # वेरिफिकेशन की जांच
-        needs_verification = await check_verification_required(user_id)
-        
-        if needs_verification:
-            await query.answer("फाइल पाने के लिए कृपया पहले वेरीफाई करें!", show_alert=True)
-            # file_id को वेरिफिकेशन मैसेज में भेजें
-            await show_verification_message(client, query, user_id, file_id=file_id)
-            return
-            
         files_ = await get_file_details(file_id)
         if not files_:
-            return await query.answer('ऐसी कोई फ़ाइल मौजूद नहीं है।')
+            return await query.answer('No such file exist.')
 
         files = files_[0]
         title = files.file_name
@@ -422,11 +411,14 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if f_caption is None:
             f_caption = f"{files.file_name}"
 
+        # Check if the user is subscribed to the AUTH_CHANNEL
         if AUTH_CHANNEL and not await is_subscribed(client, query):
+            # If not subscribed, show a pop-up with a link to the bot
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start=subscribe")
             return
             
         try:
+            # Try to send the file to the user's PM
             pm_message = await client.send_cached_media(
                 chat_id=query.from_user.id,
                 file_id=file_id,
@@ -434,6 +426,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 protect_content=True if ident == "filep" else False 
             )
             
+            # Send the warning message in PM
             pm_warning_message = """
 Hello,
 
@@ -450,6 +443,7 @@ Hello,
                 reply_to_message_id=pm_message.id
             )
             
+            # Schedule deletion of the file and warning in PM
             await asyncio.sleep(300) 
             try:
                 await pm_message.delete()
@@ -457,33 +451,27 @@ Hello,
             except Exception:
                 pass
             
+            # If file sending is successful, show the success pop-up in the group
             group_notification = "✅ फ़ाइल आपके PM (प्राइवेट मैसेज) में भेज दी गई है।\n\n✅ File has been sent to your PM."
             await query.answer(group_notification, show_alert=True)
             
         except UserIsBlocked:
+            # If the user has blocked the bot
             await query.answer('आपने बॉट को ब्लॉक किया हुआ है। कृपया अनब्लॉक करें।', show_alert=True)
         except PeerIdInvalid:
+            # If the user has not started the bot yet
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
         except Exception as e:
+            # For any other errors
             logger.exception(e)
             await query.answer(f"An error occurred: {e}", show_alert=True)
             
+    # END OF THE CORRECTED CODE BLOCK
+
     elif query.data.startswith("checksub"):
         if AUTH_CHANNEL and not await is_subscribed(client, query):
             await query.answer("I Like Your Smartness, But Don't Be Oversmart 😒", show_alert=True)
             return
-            
-        user_id = query.from_user.id
-
-        # वेरिफिकेशन की जांच
-        needs_verification = await check_verification_required(user_id)
-        
-        if needs_verification:
-            await query.answer("फाइल पाने के लिए कृपया पहले वेरीफाई करें!", show_alert=True)
-            _, file_id = query.data.split("#")
-            await show_verification_message(client, query, user_id, file_id=file_id)
-            return
-            
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
         if not files_:
@@ -504,6 +492,7 @@ Hello,
             f_caption = f"{title}"
         await query.answer()
         
+        # Send PM file
         pm_message = await client.send_cached_media(
             chat_id=query.from_user.id,
             file_id=file_id,
@@ -511,6 +500,7 @@ Hello,
             protect_content=True if ident == 'checksubp' else False
         )
         
+        # Send separate PM message
         pm_warning_message = """
 Hello,
 
@@ -527,13 +517,14 @@ Hello,
             reply_to_message_id=pm_message.id
         )
         
+        # Delete PM file and warning message after 5 minutes
         await asyncio.sleep(300) 
         try:
             await pm_message.delete()
             await warning_msg.delete()
         except Exception:
             pass
-            
+        
     elif query.data == "pages":
         await query.answer()
     elif query.data == "start":
@@ -749,123 +740,31 @@ Hello,
     await query.answer('Piracy Is Crime')
 
 
-async def check_verification_required(user_id):
-    """जांचें कि यूजर को वेरिफिकेशन की आवश्यकता है या नहीं"""
-    from info import VERIFICATION_REQUIRED, ADMINS
-    
-    if not VERIFICATION_REQUIRED:
-        return False
-    
-    if str(user_id) in ADMINS:
-        return False
-        
-    premium_status = await db.get_premium_status(user_id)
-    if premium_status.get('is_premium'):
-        return False
-        
-    if await db.check_verification_status(user_id):
-        return False
-        
-    return True
-
-async def show_verification_message(client, context, user_id, file_id=None):
-    """वेरिफिकेशन आवश्यक संदेश बटनों के साथ दिखाएं"""
-    from info import BLOGGER_REDIRECT_URL, VERIFY_BUTTON_TEXT, BUY_PREMIUM_TEXT
-    
-    # यह जांचें कि `context` एक `CallbackQuery` है या `Message` ऑब्जेक्ट
-    if isinstance(context, CallbackQuery):
-        message = context.message
-    else:
-        message = context
-
-    verification_msg = """
-🔒 **VERIFICATION REQUIRED**
-
-आपको फ़ाइल प्राप्त करने के लिए verify होना आवश्यक है।
-
-**✅ VERIFICATION BENEFITS:**
-• 24 घंटे के लिए unlimited access
-• सभी files प्राप्त करें
-• No restrictions
-
-**💰 PREMIUM BENEFITS:**
-• No verification required
-• Direct file access
-• Priority support
-"""
-    
-    # ✅ FIXED: सीधे BLOGGER_REDIRECT_URL का उपयोग करें (Google Script)
-    if file_id:
-        verification_url = f"{BLOGGER_REDIRECT_URL}?token={file_id}"
-    else:
-        verification_url = BLOGGER_REDIRECT_URL
-
-    # ✅ डिबगिंग के लिए print कमांड
-    print(f"DEBUG: User {user_id} verification URL: {verification_url}")
-
-    buttons = [
-        [
-            InlineKeyboardButton(
-                VERIFY_BUTTON_TEXT, 
-                url=verification_url
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                BUY_PREMIUM_TEXT,
-                callback_data="buy_premium"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "❌ CLOSE",
-                callback_data="close_data"
-            )
-        ]
-    ]
-    
-    # मूल संदेश पर उत्तर दें
-    await message.reply_text(
-        verification_msg,
-        reply_markup=InlineKeyboardMarkup(buttons),
-        quote=True
-    )
-
+# Added sticker_msg argument, is_spellcheck_result argument
 async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_spellcheck_result=False):
+    # Determine the message object to use
     message = msg.message.reply_to_message if is_spellcheck_result else msg
-    
-    user_id = msg.from_user.id if msg.from_user else None
-    if user_id:
-        needs_verification = await check_verification_required(user_id)
-        if needs_verification:
-            if sticker_msg:
-                try:
-                    await sticker_msg.delete()
-                except:
-                    pass
-            
-            # वेरिफिकेशन संदेश दिखाएं
-            await show_verification_message(client, message, user_id)
-            return
     
     if not spoll:
         settings = await get_settings(message.chat.id)
         if message.text.startswith("/"): 
-            if sticker_msg: await sticker_msg.delete()
-            return
+            if sticker_msg: await sticker_msg.delete() # delete sticker if it's a command
+            return  # ignore commands
         if re.findall("((^\/|^,|^!|^\.|^[\U0001F600-\U000E007F]).*)", message.text):
-            if sticker_msg: await sticker_msg.delete()
+            if sticker_msg: await sticker_msg.delete() # delete sticker if it's not a search query
             return
         if 2 < len(message.text) < 100:
             search = message.text
             files, offset, total_results = await get_search_results(search.lower(), offset=0, filter=True)
             
+            # Delete sticker immediately after getting search results
             if sticker_msg: 
                 try:
                     await sticker_msg.delete() 
                 except:
                     pass
             
+            # Custom not found message
             not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -878,9 +777,12 @@ Search other bot - @asfilter_bot
 
             if not files:
                 if settings["spell_check"]:
+                    # Pass the original message for spell check
                     return await advantage_spell_chok(msg)
                 else:
+                    # Send custom not found message (Fix: Ensure this shows if spell check is off and no results)
                     k = await msg.reply(not_found_msg)
+                    # Delete message after 2 minutes (120 seconds)
                     await asyncio.sleep(120)
                     try:
                         await k.delete()
@@ -890,12 +792,13 @@ Search other bot - @asfilter_bot
         else:
             if sticker_msg: 
                 try:
-                    await sticker_msg.delete()
+                    await sticker_msg.delete() # delete sticker if query is too short/long
                 except:
                     pass
             return
     else:
-        settings = await get_settings(message.chat.id)
+        # If it's a result from spell check, sticker should be deleted already.
+        settings = await get_settings(message.chat.id) # Use the correct message object (original message)
         search, files, offset, total_results = spoll
         
     pre = 'filep' if settings['file_secure'] else 'file'
@@ -903,6 +806,7 @@ Search other bot - @asfilter_bot
         btn = [
             [
                 InlineKeyboardButton(
+                    # Added file emoji and size in single button mode
                     text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
@@ -916,6 +820,7 @@ Search other bot - @asfilter_bot
                     callback_data=f'{pre}#{file.file_id}',
                 ),
                 InlineKeyboardButton(
+                    # Added file emoji in size button
                     text=f"📁 {get_size(file.file_size)}",
                     callback_data=f'{pre}#{file.file_id}',
                 ),
@@ -923,6 +828,7 @@ Search other bot - @asfilter_bot
             for file in files
         ]
 
+    # Add PM button
     pm_button = [InlineKeyboardButton("👉 ᴄʜᴇᴄᴋ ʙᴏᴛ ᴘᴍ 👈", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
     if offset != "":
@@ -938,10 +844,12 @@ Search other bot - @asfilter_bot
             [InlineKeyboardButton(text="🗓 1/1", callback_data="pages")]
         )
     
+    # Add PM button to the last row
     btn.append(pm_button) 
 
     imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
     
+    # Custom Caption setup
     try:
         req_by = message.from_user.mention
     except:
@@ -951,6 +859,7 @@ Search other bot - @asfilter_bot
     except:
         group_title = "Group"
         
+    # The new result message template
     custom_caption = f"""
 📂 ʜᴇʀᴇ ɪ ꜰᴏᴜɴᴅ ꜰᴏʀ ʏᴏᴜʀ sᴇᴀʀᴄʜ - **{search}**
 
@@ -960,7 +869,7 @@ Search other bot - @asfilter_bot
 🍿 Your Movie Files 👇
 """
     
-    TEMPLATE = settings.get('template', IMDB_TEMPLATE)
+    TEMPLATE = settings.get('template', IMDB_TEMPLATE) # Fallback to IMDB_TEMPLATE if 'template' is not set
     
     if imdb:
         cap = TEMPLATE.format(
@@ -994,13 +903,18 @@ Search other bot - @asfilter_bot
             url=imdb['url'],
             **locals()
         )
+        # Prepend custom header to IMDB caption
         cap = custom_caption + "\n" + cap
         
     else:
+        # Use custom header for non-IMDB caption
         cap = custom_caption
         
+    
+    
     if imdb and imdb.get('poster'):
         try:
+            # Send photo and then delete the result message after 5 minutes
             result_msg = await message.reply_photo(photo=imdb.get('poster'), caption=cap[:1024],
                                       reply_markup=InlineKeyboardMarkup(btn))
             
@@ -1013,6 +927,7 @@ Search other bot - @asfilter_bot
         except (MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty):
             pic = imdb.get('poster')
             poster = pic.replace('.jpg', "._V1_UX360.jpg")
+            # Send photo and then delete the result message after 5 minutes
             result_msg = await message.reply_photo(photo=poster, caption=cap[:1024], reply_markup=InlineKeyboardMarkup(btn))
             
             await asyncio.sleep(300) 
@@ -1023,6 +938,7 @@ Search other bot - @asfilter_bot
             
         except Exception as e:
             logger.exception(e)
+            # Send text and then delete the result message after 5 minutes
             result_msg = await message.reply_text(cap, reply_markup=InlineKeyboardMarkup(btn))
             
             await asyncio.sleep(300) 
@@ -1032,6 +948,7 @@ Search other bot - @asfilter_bot
                 pass
             
     else:
+        # Send text and then delete the result message after 5 minutes
         result_msg = await message.reply_text(cap, reply_markup=InlineKeyboardMarkup(btn))
         
         await asyncio.sleep(300) 
@@ -1040,7 +957,9 @@ Search other bot - @asfilter_bot
         except Exception:
             pass
         
+        
     if is_spellcheck_result:
+        # Delete the spell-check message (the one showing the options) if it was a result from a callback query
         try:
             await msg.message.delete()
         except Exception:
@@ -1053,12 +972,13 @@ async def advantage_spell_chok(msg):
     
     query = re.sub(
         r"\b(pl(i|e)*?(s|z+|ease|se|ese|(e+)s(e)?)|((send|snd|giv(e)?|gib)(\sme)?)|movie(s)?|new|latest|br((o|u)h?)*|^h(e|a)?(l)*(o)*|mal(ayalam)?|t(h)?amil|file|that|find|und(o)*|kit(t(i|y)?)?o(w)?|thar(u)?(o)*w?|kittum(o)*|aya(k)*(um(o)*)?|full\smovie|any(one)|with\ssubtitle(s)?)",
-        "", msg.text, flags=re.IGNORECASE)
+        "", msg.text, flags=re.IGNORECASE)  # plis contribute some common words
     query = query.strip() + " movie"
     g_s = await search_gagala(query)
     g_s += await search_gagala(msg.text)
     gs_parsed = []
     
+    # Custom not found message
     not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -1069,6 +989,7 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 Search other bot - @asfilter_bot
 """
     
+    # Fix 1: Stop and send not found message if no google search results
     if not g_s:
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
@@ -1078,31 +999,32 @@ Search other bot - @asfilter_bot
             pass
         return
         
-    regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)
+    regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)  # look for imdb / wiki results
     gs = list(filter(regex.match, g_s))
     gs_parsed = [re.sub(
         r'\b(\-([a-zA-Z-\s])\-\simdb|(\-\s)?imdb|(\-\s)?wikipedia|\(|\)|\-|reviews|full|all|episode(s)?|film|movie|series)',
         '', i, flags=re.IGNORECASE) for i in gs]
     if not gs_parsed:
         reg = re.compile(r"watch(\s[a-zA-Z0-9_\s\-\(\)]*)*\|.*",
-                         re.IGNORECASE)
+                         re.IGNORECASE)  # match something like Watch Niram | Amazon Prime
         for mv in g_s:
             match = reg.match(mv)
             if match:
                 gs_parsed.append(match.group(1))
     user = msg.from_user.id if msg.from_user else 0
     movielist = []
-    gs_parsed = list(dict.fromkeys(gs_parsed))
+    gs_parsed = list(dict.fromkeys(gs_parsed))  # removing duplicates https://stackoverflow.com/a/7961425
     if len(gs_parsed) > 3:
         gs_parsed = gs_parsed[:3]
     if gs_parsed:
         for mov in gs_parsed:
-            imdb_s = await get_poster(mov.strip(), bulk=True)
+            imdb_s = await get_poster(mov.strip(), bulk=True)  # searching each keyword in imdb
             if imdb_s:
                 movielist += [movie.get('title') for movie in imdb_s]
     movielist += [(re.sub(r'(\-|\(|\)|_)', '', i, flags=re.IGNORECASE)).strip() for i in gs_parsed]
-    movielist = list(dict.fromkeys(movielist))
+    movielist = list(dict.fromkeys(movielist))  # removing duplicates
     
+    # Fix 1: Stop and send not found message if no movie suggestions found
     if not movielist:
         final_msg = await processing_msg.edit_text(not_found_msg)
         await asyncio.sleep(120)
@@ -1121,6 +1043,7 @@ Search other bot - @asfilter_bot
     ] for k, movie in enumerate(movielist)]
     btn.append([InlineKeyboardButton(text="❌ ᴄʟᴏsᴇ sᴘᴇʟʟ ᴄʜᴇᴄᴋ ❌", callback_data=f'spolling#{user}#close_spellcheck')])
     
+    # Edit the processing message to show the spell check options
     await processing_msg.edit_text("🤔 ɪ ᴄᴏᴜʟᴅɴ'ᴛ ꜰɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\n\n**ᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏꜰ ᴛʜᴇsᴇ?**",
                                     reply_markup=InlineKeyboardMarkup(btn))
 
@@ -1128,12 +1051,14 @@ Search other bot - @asfilter_bot
 async def manual_filters(client, message, text=False, sticker_msg: Message = None, is_spellcheck=False):
     group_id = message.chat.id
     name = text or message.text
+    # Get the ID of the original message to reply to, or the new message ID if no reply is available.
     reply_id = message.reply_to_message.id if message.reply_to_message and not is_spellcheck else message.id
     keywords = await get_filters(group_id)
     
-    if is_spellcheck:
+    if is_spellcheck: # For spell check manual filter, reply to the original user's message
         reply_id = message.id
         
+    # Delete sticker before sending the manual filter response
     if sticker_msg: 
         try:
             await sticker_msg.delete()
@@ -1178,6 +1103,7 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
                             reply_to_message_id=reply_id
                         )
                         
+                    # Delete the result message after 5 minutes (300 seconds)
                     await asyncio.sleep(300) 
                     try:
                         await result_msg.delete()
@@ -1186,6 +1112,7 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
                     
                 except Exception as e:
                     logger.exception(e)
-                return True
+                return True # Return True if manual filter was found and sent
     else:
-        return False
+        return False # Return False if no manual filter was found
+
