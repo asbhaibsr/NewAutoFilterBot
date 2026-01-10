@@ -150,7 +150,7 @@ async def advantage_spoll_choker(bot, query):
         await asyncio.sleep(2)
         try:
             await query.message.delete()
-            # User ka message delete NAHI karo
+            # User ka message delete NAHI karo - NOT FOUND CASE
         except Exception:
             pass
         return
@@ -193,11 +193,11 @@ Search other bot
                 reply_markup=other_bot_button
             )
             # Delete only bot's message after 2 minutes (120 seconds)
-            # USER KA MESSAGE DELETE NAHI HOGA
+            # USER KA MESSAGE DELETE NAHI HOGA - NOT FOUND CASE
             await asyncio.sleep(120)
             try:
                 await final_msg.delete()
-                # User ka message delete NAHI karo
+                # User ka message delete NAHI karo - NOT FOUND CASE
             except Exception:
                 pass
     else:
@@ -853,11 +853,11 @@ Search other bot
                                 reply_markup=other_bot_button
                             )
                             # Delete only bot's message after 2 minutes (120 seconds)
-                            # USER KA SEARCH MESSAGE DELETE NAHI HOGA
+                            # USER KA SEARCH MESSAGE DELETE NAHI HOGA - NOT FOUND CASE
                             await asyncio.sleep(120)
                             try:
                                 await k.delete()
-                                # USER KA MESSAGE DELETE NAHI KARO
+                                # USER KA MESSAGE DELETE NAHI KARO - NOT FOUND CASE
                             except Exception:
                                 pass
                             return
@@ -872,11 +872,11 @@ Search other bot
                             reply_markup=other_bot_button
                         )
                         # Delete only bot's message after 2 minutes (120 seconds)
-                        # USER KA SEARCH MESSAGE DELETE NAHI HOGA
+                        # USER KA SEARCH MESSAGE DELETE NAHI HOGA - NOT FOUND CASE
                         await asyncio.sleep(120)
                         try:
                             await k.delete()
-                            # USER KA MESSAGE DELETE NAHI KARO
+                            # USER KA MESSAGE DELETE NAHI KARO - NOT FOUND CASE
                         except Exception:
                             pass
                         return
@@ -1008,7 +1008,8 @@ Search other bot
             await asyncio.sleep(300)  # 5 minutes
             try:
                 await result_msg.delete()  # Bot ka result delete
-                # USER KA SEARCH MESSAGE DELETE NAHI HOGA
+                # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
+                await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
             except Exception:
                 pass
             
@@ -1021,7 +1022,8 @@ Search other bot
             await asyncio.sleep(300)  # 5 minutes
             try:
                 await result_msg.delete()  # Bot ka result delete
-                # USER KA SEARCH MESSAGE DELETE NAHI HOGA
+                # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
+                await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
             except Exception:
                 pass
             
@@ -1033,7 +1035,8 @@ Search other bot
             await asyncio.sleep(300)  # 5 minutes
             try:
                 await result_msg.delete()  # Bot ka result delete
-                # USER KA SEARCH MESSAGE DELETE NAHI HOGA
+                # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
+                await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
             except Exception:
                 pass
             
@@ -1044,7 +1047,8 @@ Search other bot
         await asyncio.sleep(300)  # 5 minutes
         try:
             await result_msg.delete()  # Bot ka result delete
-            # USER KA SEARCH MESSAGE DELETE NAHI HOGA
+            # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
+            await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
         except Exception:
             pass
         
@@ -1091,7 +1095,7 @@ Search other bot
         await asyncio.sleep(120)  # 2 minutes
         try:
             await final_msg.delete()
-            # User message delete NAHI karo
+            # User message delete NAHI karo - NOT FOUND CASE
         except:
             pass
         return
@@ -1134,7 +1138,7 @@ Search other bot
         await asyncio.sleep(120)  # 2 minutes
         try:
             await final_msg.delete()
-            # User message delete NAHI karo
+            # User message delete NAHI karo - NOT FOUND CASE
         except:
             pass
         return
@@ -1212,7 +1216,8 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
                     await asyncio.sleep(300)
                     try:
                         await result_msg.delete()
-                        # USER KA SEARCH MESSAGE DELETE NAHI HOGA
+                        # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
+                        await message.delete()
                     except Exception:
                         pass
                     
