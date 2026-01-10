@@ -105,8 +105,8 @@ async def next_page(bot, query):
     else:
         off_set = offset - 10
         
-    # Add PM button to the last page
-    pm_button = [InlineKeyboardButton("👉 ᴄʜᴇᴄᴋ ʙᴏᴛ ᴘᴍ 👈", url=f"https://t.me/{BOT_PM_USERNAME}")]
+    # Add PM button to the last page with new text
+    pm_button = [InlineKeyboardButton("(⋆. 𐙚˚࿔ 𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 𝘁𝗼 𝗴𝗲𝘁 𝘁𝗵𝗲 𝗳𝗶𝗹𝗲 ᯓᡣ𐭩˚⋆)", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
     if n_offset == 0:
         btn.append(
@@ -150,9 +150,7 @@ async def advantage_spoll_choker(bot, query):
         await asyncio.sleep(2)
         try:
             await query.message.delete()
-            # User ka message bhi delete karo
-            if query.message.reply_to_message:
-                await query.message.reply_to_message.delete()
+            # User ka message delete NAHI karo
         except Exception:
             pass
         return
@@ -163,12 +161,12 @@ async def advantage_spoll_choker(bot, query):
         
     movie = movies[(int(movie_))]
     
-    # Show message that bot is checking (Corrected as per request)
+    # Show message that bot is checking
     checking_msg = await query.message.edit_text(f'🔍 ᴄʜᴇᴄᴋɪɴɢ ꜰᴏʀ: **{movie}** ɪɴ ᴅᴀᴛᴀʙᴀsᴇ... ⏳')
     
-    k = await manual_filters(bot, query.message.reply_to_message, text=movie, is_spellcheck=True) # Check manual filter first
+    k = await manual_filters(bot, query.message.reply_to_message, text=movie, is_spellcheck=True)
     
-    # Custom not found message
+    # Custom not found message with button
     not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -176,24 +174,30 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 
 ●■●■●■●■●■●■●■
 
-Search other bot - @asfilter_bot
+Search other bot
 """
     
-    if k == False: # If manual filter didn't find anything
+    if k == False:
         files, offset, total_results = await get_search_results(movie, offset=0, filter=True)
         if files:
             k = (movie, files, offset, total_results)
-            await auto_filter(bot, query, k, is_spellcheck_result=True) # Pass the callback query as the first argument
+            await auto_filter(bot, query, k, is_spellcheck_result=True)
         else:
-            # Send your custom "not found" message here (Fix: Show not found message if no results after spelling check)
-            final_msg = await checking_msg.edit_text(not_found_msg)
-            # Delete message after 2 minutes (120 seconds)
+            # Create inline button for other bot
+            other_bot_button = InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔍 Search Other Bot", url="t.me/asfilter_bot")
+            ]])
+            
+            final_msg = await checking_msg.edit_text(
+                not_found_msg, 
+                reply_markup=other_bot_button
+            )
+            # Delete only bot's message after 2 minutes (120 seconds)
+            # USER KA MESSAGE DELETE NAHI HOGA
             await asyncio.sleep(120)
             try:
                 await final_msg.delete()
-                # User ka message bhi delete karo
-                if query.message.reply_to_message:
-                    await query.message.reply_to_message.delete()
+                # User ka message delete NAHI karo
             except Exception:
                 pass
     else:
@@ -437,7 +441,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 protect_content=True if ident == "filep" else False 
             )
             
-            # THIRD: Send the warning message in PM
+            # THIRD: Send the warning message in PM with updated text
             pm_warning_message = """
 Hello,
 
@@ -559,7 +563,6 @@ Hello,
     elif query.data == "pages":
         await query.answer()
         
-    # FIX: /start commands ke buttons ko commands.py ke buttons se match kiya gaya
     elif query.data == "start":
         buttons = [[
             InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
@@ -775,7 +778,6 @@ Hello,
     await query.answer('Piracy Is Crime')
 
 
-# Added sticker_msg argument, is_spellcheck_result argument
 async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_spellcheck_result=False):
     # Determine the message object to use
     if is_spellcheck_result:
@@ -802,6 +804,8 @@ async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_
             return
         if 2 < len(message.text) < 100:
             search = message.text
+            
+            # First try exact search
             files, offset, total_results = await get_search_results(search.lower(), offset=0, filter=True)
             
             # Delete sticker immediately after getting search results
@@ -811,7 +815,7 @@ async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_
                 except:
                     pass
             
-            # Custom not found message
+            # Custom not found message with button
             not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -819,25 +823,63 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 
 ●■●■●■●■●■●■●■
 
-Search other bot - @asfilter_bot
+Search other bot
 """
+            
+            # Create inline button for other bot
+            other_bot_button = InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔍 Search Other Bot", url="t.me/asfilter_bot")
+            ]])
 
             if not files:
-                if settings["spell_check"]:
-                    # Pass the original message for spell check
-                    return await advantage_spell_chok(msg)
+                # Try spelling correction
+                corrected_search = await correct_spelling(search)
+                
+                if corrected_search and corrected_search.lower() != search.lower():
+                    # Try with corrected spelling
+                    files, offset, total_results = await get_search_results(corrected_search.lower(), offset=0, filter=True)
+                    
+                    if files:
+                        # Show that we're using corrected spelling
+                        search = corrected_search
+                    else:
+                        if settings["spell_check"]:
+                            # Pass the original message for spell check
+                            return await advantage_spell_chok(msg)
+                        else:
+                            # Send custom not found message with button
+                            k = await message.reply(
+                                not_found_msg, 
+                                reply_markup=other_bot_button
+                            )
+                            # Delete only bot's message after 2 minutes (120 seconds)
+                            # USER KA SEARCH MESSAGE DELETE NAHI HOGA
+                            await asyncio.sleep(120)
+                            try:
+                                await k.delete()
+                                # USER KA MESSAGE DELETE NAHI KARO
+                            except Exception:
+                                pass
+                            return
                 else:
-                    # Send custom not found message
-                    k = await message.reply(not_found_msg)
-                    # Delete message after 2 minutes (120 seconds) and user's message
-                    await asyncio.sleep(120)
-                    try:
-                        await k.delete()
-                        # USER KA SEARCH MESSAGE DELETE ✅
-                        await message.delete()
-                    except Exception:
-                        pass
-                    return
+                    if settings["spell_check"]:
+                        # Pass the original message for spell check
+                        return await advantage_spell_chok(msg)
+                    else:
+                        # Send custom not found message with button
+                        k = await message.reply(
+                            not_found_msg, 
+                            reply_markup=other_bot_button
+                        )
+                        # Delete only bot's message after 2 minutes (120 seconds)
+                        # USER KA SEARCH MESSAGE DELETE NAHI HOGA
+                        await asyncio.sleep(120)
+                        try:
+                            await k.delete()
+                            # USER KA MESSAGE DELETE NAHI KARO
+                        except Exception:
+                            pass
+                        return
         else:
             if sticker_msg: 
                 try:
@@ -875,8 +917,8 @@ Search other bot - @asfilter_bot
             for file in files
         ]
 
-    # Add PM button
-    pm_button = [InlineKeyboardButton("👉 ᴄʜᴇᴄᴋ ʙᴏᴛ ᴘᴍ 👈", url=f"https://t.me/{BOT_PM_USERNAME}")]
+    # Add PM button with updated text
+    pm_button = [InlineKeyboardButton("(⋆. 𐙚˚࿔ 𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 𝘁𝗼 𝗴𝗲𝘁 𝘁𝗵𝗲 𝗳𝗶𝗹𝗲 ᯓᡣ𐭩˚⋆)", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
     if offset != "":
         key = f"{message.chat.id}-{message.id}"
@@ -966,7 +1008,7 @@ Search other bot - @asfilter_bot
             await asyncio.sleep(300)  # 5 minutes
             try:
                 await result_msg.delete()  # Bot ka result delete
-                await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
+                # USER KA SEARCH MESSAGE DELETE NAHI HOGA
             except Exception:
                 pass
             
@@ -979,7 +1021,7 @@ Search other bot - @asfilter_bot
             await asyncio.sleep(300)  # 5 minutes
             try:
                 await result_msg.delete()  # Bot ka result delete
-                await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
+                # USER KA SEARCH MESSAGE DELETE NAHI HOGA
             except Exception:
                 pass
             
@@ -991,7 +1033,7 @@ Search other bot - @asfilter_bot
             await asyncio.sleep(300)  # 5 minutes
             try:
                 await result_msg.delete()  # Bot ka result delete
-                await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
+                # USER KA SEARCH MESSAGE DELETE NAHI HOGA
             except Exception:
                 pass
             
@@ -1002,7 +1044,7 @@ Search other bot - @asfilter_bot
         await asyncio.sleep(300)  # 5 minutes
         try:
             await result_msg.delete()  # Bot ka result delete
-            await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
+            # USER KA SEARCH MESSAGE DELETE NAHI HOGA
         except Exception:
             pass
         
@@ -1025,7 +1067,7 @@ async def advantage_spell_chok(msg):
 
     g_s = await search_gagala(query)
     
-    # Custom not found message
+    # Custom not found message with button
     not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -1033,15 +1075,23 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 
 ●■●■●■●■●■●■●■
 
-Search other bot - @asfilter_bot
+Search other bot
 """
     
+    # Create inline button for other bot
+    other_bot_button = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔍 Search Other Bot", url="t.me/asfilter_bot")
+    ]])
+    
     if not g_s:
-        final_msg = await processing_msg.edit_text(not_found_msg)
+        final_msg = await processing_msg.edit_text(
+            not_found_msg, 
+            reply_markup=other_bot_button
+        )
         await asyncio.sleep(120)  # 2 minutes
         try:
             await final_msg.delete()
-            await msg.delete()  # User message delete
+            # User message delete NAHI karo
         except:
             pass
         return
@@ -1077,11 +1127,14 @@ Search other bot - @asfilter_bot
     
     # Stop and send not found message if no movie suggestions found
     if not movielist:
-        final_msg = await processing_msg.edit_text(not_found_msg)
+        final_msg = await processing_msg.edit_text(
+            not_found_msg, 
+            reply_markup=other_bot_button
+        )
         await asyncio.sleep(120)  # 2 minutes
         try:
             await final_msg.delete()
-            await msg.delete()  # User message delete
+            # User message delete NAHI karo
         except:
             pass
         return
@@ -1159,8 +1212,7 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
                     await asyncio.sleep(300)
                     try:
                         await result_msg.delete()
-                        # USER KA SEARCH MESSAGE DELETE ✅
-                        await message.delete()
+                        # USER KA SEARCH MESSAGE DELETE NAHI HOGA
                     except Exception:
                         pass
                     
@@ -1169,3 +1221,87 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
                 return True # Return True if manual filter was found and sent
     else:
         return False # Return False if no manual filter was found
+
+
+async def correct_spelling(search_term):
+    """
+    Function to correct spelling mistakes in search term
+    """
+    try:
+        # Remove extra spaces
+        search_term = ' '.join(search_term.split())
+        
+        # Common spelling corrections dictionary
+        corrections = {
+            'avangers': 'avengers',
+            'avngers': 'avengers',
+            'avenger': 'avengers',
+            'intersteller': 'interstellar',
+            'interstalar': 'interstellar',
+            'inceptionn': 'inception',
+            'incepton': 'inception',
+            'jumanji': 'jumanji',
+            'jumanjee': 'jumanji',
+            'harry potterr': 'harry potter',
+            'harrypotter': 'harry potter',
+            'spider man': 'spider-man',
+            'spiderman': 'spider-man',
+            'iron man': 'iron man',
+            'ironman': 'iron man',
+            'bat man': 'batman',
+            'super man': 'superman',
+            'wonder women': 'wonder woman',
+            'wonderwoman': 'wonder woman',
+            'fast furious': 'fast & furious',
+            'fastandfurious': 'fast & furious',
+            'lord rings': 'lord of the rings',
+            'lordoftherings': 'lord of the rings',
+            'hobbit': 'the hobbit',
+            'transformerss': 'transformers',
+            'transformes': 'transformers',
+            'jurassic park': 'jurassic park',
+            'jurrasic': 'jurassic',
+            'terminatorr': 'terminator',
+            'terminater': 'terminator',
+            'matrixx': 'matrix',
+            'matrics': 'matrix',
+            'titanicc': 'titanic',
+            'titanik': 'titanic',
+            'avatar': 'avatar',
+            'avatarr': 'avatar',
+            'frozenn': 'frozen',
+            'froozen': 'frozen',
+            'moana': 'moana',
+            'moan': 'moana',
+            'zootopia': 'zootopia',
+            'zootpoia': 'zootopia',
+            'lion king': 'the lion king',
+            'lionking': 'the lion king',
+            'aladdin': 'aladdin',
+            'aladin': 'aladdin',
+            'beauty beast': 'beauty and the beast',
+            'beautyandbeast': 'beauty and the beast',
+            'toy story': 'toy story',
+            'toystory': 'toy story',
+            'finding nemo': 'finding nemo',
+            'findingnemo': 'finding nemo',
+            'shrek': 'shrek',
+            'shrek': 'shrek',
+        }
+        
+        # Check if search term needs correction
+        lower_term = search_term.lower()
+        if lower_term in corrections:
+            return corrections[lower_term]
+        
+        # Try to match with common patterns
+        for wrong, correct in corrections.items():
+            if wrong in lower_term:
+                return correct
+        
+        # If no correction found, return original
+        return search_term
+        
+    except Exception as e:
+        logger.error(f"Spelling correction error: {e}")
+        return search_term
