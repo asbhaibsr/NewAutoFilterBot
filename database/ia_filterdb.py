@@ -65,7 +65,6 @@ async def save_file(media):
             return True, 1
 
 
-
 async def get_search_results(query, file_type=None, max_results=10, offset=0, filter=False):
     """For given query return (results, next_offset)"""
 
@@ -111,12 +110,110 @@ async def get_search_results(query, file_type=None, max_results=10, offset=0, fi
     return files, next_offset, total_results
 
 
-
 async def get_file_details(query):
     filter = {'file_id': query}
     cursor = Media.find(filter)
     filedetails = await cursor.to_list(length=1)
     return filedetails
+
+
+async def get_bad_files():
+    """
+    Get list of bad files that should be excluded from search results
+    Returns list of file_ids that should be filtered out
+    """
+    try:
+        # Agar aapke paas alag se bad files ka collection hai
+        # bad_files_collection = db['bad_files']
+        # bad_files = await bad_files_collection.find().to_list(length=None)
+        # return [bad_file['file_id'] for bad_file in bad_files]
+        
+        # Ya agar manually kuch specific files block karni hain
+        # Example: return ["file_id_1", "file_id_2", "file_id_3"]
+        
+        # Abhi ke liye empty list return karte hain
+        return []
+    except Exception as e:
+        logger.error(f"Error getting bad files: {e}")
+        return []
+
+
+async def delete_files(query):
+    """
+    Delete files from database based on file_id
+    """
+    try:
+        if isinstance(query, list):
+            # Multiple files delete
+            result = await Media.collection.delete_many({'_id': {'$in': query}})
+            logger.info(f"Deleted {result.deleted_count} files from database")
+            return result.deleted_count
+        else:
+            # Single file delete
+            result = await Media.collection.delete_one({'_id': query})
+            if result.deleted_count:
+                logger.info(f"Deleted file {query} from database")
+                return True
+            else:
+                logger.warning(f"File {query} not found in database")
+                return False
+    except Exception as e:
+        logger.error(f"Error deleting files: {e}")
+        return False
+
+
+async def delete_all_files():
+    """
+    Delete all files from database
+    Use with caution!
+    """
+    try:
+        result = await Media.collection.delete_many({})
+        logger.info(f"Deleted all {result.deleted_count} files from database")
+        return result.deleted_count
+    except Exception as e:
+        logger.error(f"Error deleting all files: {e}")
+        return 0
+
+
+async def get_total_files():
+    """
+    Get total number of files in database
+    """
+    try:
+        count = await Media.count_documents({})
+        return count
+    except Exception as e:
+        logger.error(f"Error getting total files count: {e}")
+        return 0
+
+
+async def get_file_by_name(file_name):
+    """
+    Get file details by file name
+    """
+    try:
+        filter = {'file_name': re.compile(f'^{re.escape(file_name)}$', re.IGNORECASE)}
+        cursor = Media.find(filter)
+        files = await cursor.to_list(length=1)
+        return files[0] if files else None
+    except Exception as e:
+        logger.error(f"Error getting file by name {file_name}: {e}")
+        return None
+
+
+async def get_files_by_type(file_type, limit=100):
+    """
+    Get files by type (video, audio, document, etc.)
+    """
+    try:
+        filter = {'file_type': file_type}
+        cursor = Media.find(filter).sort('$natural', -1).limit(limit)
+        files = await cursor.to_list(length=limit)
+        return files
+    except Exception as e:
+        logger.error(f"Error getting files by type {file_type}: {e}")
+        return []
 
 
 def encode_file_id(s: bytes) -> str:
