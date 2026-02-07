@@ -2,6 +2,7 @@ import logging
 from struct import pack
 import re
 import base64
+import difflib 
 from pyrogram.file_id import FileId
 from pymongo.errors import DuplicateKeyError
 from umongo import Instance, Document, fields
@@ -11,7 +12,6 @@ from info import DATABASE_URI, DATABASE_NAME, COLLECTION_NAME, USE_CAPTION_FILTE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
 
 client = AsyncIOMotorClient(DATABASE_URI)
 db = client[DATABASE_NAME]
@@ -31,15 +31,12 @@ class Media(Document):
         indexes = ('$file_name', )
         collection_name = COLLECTION_NAME
 
-
 async def save_file(media):
     """Save file in database"""
-
     # TODO: Find better way to get same file_id for same media to avoid duplicates
     file_id, file_ref = unpack_new_file_id(media.file_id)
     file_name = re.sub(r"(_|\-|\.|\+)", " ", str(media.file_name))
     
-    # Ye line ab sahi jagah par hai
     try:
         file = Media(
             file_id=file_id,
@@ -48,7 +45,6 @@ async def save_file(media):
             file_size=media.file_size,
             file_type=media.file_type,
             mime_type=media.mime_type,
-            # Niche wali line change ki gayi hai extra links hatane ke liye
             caption=file_name, 
         )
     except ValidationError:
@@ -61,22 +57,14 @@ async def save_file(media):
             logger.warning(
                 f'{getattr(media, "file_name", "NO_FILE")} is already saved in database'
             )
-
             return False, 0
         else:
             logger.info(f'{getattr(media, "file_name", "NO_FILE")} is saved to database')
             return True, 1
 
-
-
 async def get_search_results(query, file_type=None, max_results=10, offset=0, filter=False):
     """For given query return (results, next_offset)"""
-
     query = query.strip()
-    #if filter:
-        #better ?
-        #query = query.replace(' ', r'(\s|\.|\+|\-|_)')
-        #raw_pattern = r'(\s|_|\-|\.|\+)' + query + r'(\s|_|\-|\.|\+)'
     if not query:
         raw_pattern = '.'
     elif ' ' not in query:
@@ -87,23 +75,19 @@ async def get_search_results(query, file_type=None, max_results=10, offset=0, fi
     try:
         regex = re.compile(raw_pattern, flags=re.IGNORECASE)
     except:
-        return []
+        return [], '', 0
 
     if USE_CAPTION_FILTER:
-        filter = {'$or': [{'file_name': regex}, {'caption': regex}]}
+        filter_dict = {'$or': [{'file_name': regex}, {'caption': regex}]}
     else:
-        filter = {'file_name': regex}
+        filter_dict = {'file_name': regex}
 
     if file_type:
-        filter['file_type'] = file_type
+        filter_dict['file_type'] = file_type
 
-    total_results = await Media.count_documents(filter)
-    next_offset = offset + max_results
-
-    if next_offset > total_results:
-        next_offset = ''
-
-    cursor = Media.find(filter)
+    # --- 1. First Try: Exact/Strict Regex Search ---
+    total_results = await Media.count_documents(filter_dict)
+    cursor = Media.find(filter_dict)
     # Sort by recent
     cursor.sort('$natural', -1)
     # Slice files according to offset and max results
@@ -111,16 +95,83 @@ async def get_search_results(query, file_type=None, max_results=10, offset=0, fi
     # Get list of files
     files = await cursor.to_list(length=max_results)
 
-    return files, next_offset, total_results
+    # If files found using strict search, return them immediately
+    if files:
+        next_offset = offset + max_results
+        if next_offset > total_results:
+            next_offset = ''
+        return files, next_offset, total_results
 
+    # --- 2. Second Try: Smart Fuzzy Search (If Exact Failed) ---
+    # Logic: 50% similarity match
+    
+    # Break query into words (e.g. "Stanger Things" -> ["Stanger", "Things"])
+    words = query.split()
+    if len(words) > 0:
+        # Create a looser regex: Find files containing ANY of the words from the query
+        # This filters the DB down to relevant files before we check similarity
+        search_words = [re.escape(word) for word in words if len(word) > 2]
+        
+        if not search_words:
+            return [], '', 0
+            
+        loose_pattern = "|".join(search_words)
+        try:
+            loose_regex = re.compile(loose_pattern, flags=re.IGNORECASE)
+        except:
+            return [], '', 0
 
+        if USE_CAPTION_FILTER:
+            loose_filter = {'$or': [{'file_name': loose_regex}, {'caption': loose_regex}]}
+        else:
+            loose_filter = {'file_name': loose_regex}
+
+        if file_type:
+            loose_filter['file_type'] = file_type
+
+        # Fetch potential candidates (Limit to 200 to save memory/speed)
+        cursor = Media.find(loose_filter)
+        cursor.sort('$natural', -1)
+        potential_files = await cursor.to_list(length=200)
+
+        final_files = []
+        for file in potential_files:
+            # 1. Check normal similarity
+            ratio = difflib.SequenceMatcher(None, query.lower(), file.file_name.lower()).ratio()
+            
+            # 2. Check similarity removing spaces (Fixes "Kal ki" vs "Kalki")
+            ratio2 = difflib.SequenceMatcher(None, query.replace(" ", "").lower(), file.file_name.replace(" ", "").lower()).ratio()
+            
+            # Use the better score of the two
+            score = max(ratio, ratio2)
+            
+            # Threshold set to 50% (0.5) as requested
+            if score >= 0.50:
+                final_files.append((file, score))
+
+        # Sort results by best match score (highest score first)
+        final_files.sort(key=lambda x: x[1], reverse=True)
+        
+        # Extract just the file objects
+        sorted_files = [x[0] for x in final_files]
+
+        # Handle Pagination manually since we sorted in Python
+        total_results = len(sorted_files)
+        files = sorted_files[offset:offset+max_results]
+        next_offset = offset + max_results
+        
+        if next_offset >= total_results:
+            next_offset = ''
+            
+        return files, next_offset, total_results
+
+    return [], '', 0
 
 async def get_file_details(query):
     filter = {'file_id': query}
     cursor = Media.find(filter)
     filedetails = await cursor.to_list(length=1)
     return filedetails
-
 
 def encode_file_id(s: bytes) -> str:
     r = b""
@@ -138,10 +189,8 @@ def encode_file_id(s: bytes) -> str:
 
     return base64.urlsafe_b64encode(r).decode().rstrip("=")
 
-
 def encode_file_ref(file_ref: bytes) -> str:
     return base64.urlsafe_b64encode(file_ref).decode().rstrip("=")
-
 
 def unpack_new_file_id(new_file_id):
     """Return file_id, file_ref"""
