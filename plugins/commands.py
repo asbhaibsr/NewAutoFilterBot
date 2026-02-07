@@ -5,7 +5,8 @@ import asyncio
 from Script import script
 from pyrogram import Client, filters, enums
 from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, ChannelInvalid, MessageNotModified
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+# ForceReply yahan add kiya gaya hai
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from database.ia_filterdb import Media, get_file_details, unpack_new_file_id
 from database.users_chats_db import db
 from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT
@@ -96,7 +97,8 @@ async def start(client, message):
         ],[
             InlineKeyboardButton('🤖 ᴏᴛʜᴇʀ ʙᴏᴛs & ᴄᴏɴᴛᴀᴄᴛ 🤖', callback_data='other_bots_0')
         ],[
-            InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇs', url='https://t.me/asbhai_bsr')
+            # Yaha Update button hatakar Request button lagaya gaya hai
+            InlineKeyboardButton('📝 ʀᴇǫᴜᴇsᴛ ᴍᴏᴠɪᴇ/sᴇʀɪᴇs', callback_data='request_movie')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await message.reply_photo(
@@ -366,6 +368,106 @@ async def start_back_callback(client, query):
         )
     except Exception as e:
         logger.error(f"Error in start_back_callback: {e}")
+
+# ---------------- REQUEST MOVIE SYSTEM START ---------------- #
+
+@Client.on_callback_query(filters.regex("request_movie"))
+async def request_movie_click(client, query):
+    # Jab user Request button dabayega
+    await query.answer()
+    await client.send_message(
+        chat_id=query.from_user.id,
+        text="👋 **Hello " + query.from_user.first_name + "!**\n\n"
+             "Apni Movie/Series ka naam Language aur Year ke sath niche likh kar bhejein.\n\n"
+             "Example: `Pushpa 2 Hindi 2024`",
+        reply_markup=ForceReply(selective=True)
+    )
+
+# User ka Reply pakadne ke liye
+@Client.on_message(filters.private & filters.reply)
+async def handle_request_reply(client, message):
+    # Check karein ki ye Request ka hi reply hai ya nahi
+    if message.reply_to_message and "Apni Movie/Series ka naam" in message.reply_to_message.text:
+        
+        request_text = message.text
+        user_id = message.from_user.id
+        user_mention = message.from_user.mention
+        
+        # User ko batayein ki request bhej di gayi hai
+        await message.reply_text("✅ **Aapki Request Owner ko bhej di gayi hai!**\nJald hi upload kar di jayegi.")
+        
+        # Owner ke liye buttons
+        admin_buttons = [
+            [
+                InlineKeyboardButton("✅ Uploaded", callback_data=f"reqstatus#up#{user_id}"),
+                InlineKeyboardButton("❌ Rejected", callback_data=f"reqstatus#rej#{user_id}")
+            ],
+            [
+                InlineKeyboardButton("⚠️ Not Released", callback_data=f"reqstatus#nore#{user_id}")
+            ]
+        ]
+        
+        # Saare Admins ko message bhejein
+        notification_text = (
+            f"🔔 **New Movie Request!**\n\n"
+            f"👤 **User:** {user_mention} (`{user_id}`)\n"
+            f"🎬 **Request:** `{request_text}`"
+        )
+        
+        for admin_id in ADMINS:
+            try:
+                await client.send_message(
+                    chat_id=int(admin_id),
+                    text=notification_text,
+                    reply_markup=InlineKeyboardMarkup(admin_buttons)
+                )
+            except Exception as e:
+                logger.error(f"Failed to send request to admin {admin_id}: {e}")
+
+# Owner jab Button par click karega (Uploaded/Rejected/Not Released)
+@Client.on_callback_query(filters.regex(r"^reqstatus"))
+async def handle_request_status(client, query):
+    data = query.data.split("#")
+    action = data[1]
+    user_id = int(data[2])
+    
+    movie_name = "Unknown"
+    # Admin ke message se Movie ka naam nikalne ki koshish (Formatting par depend karta hai)
+    try:
+        movie_name = query.message.text.split("Request:** `")[1].split("`")[0]
+    except:
+        pass
+
+    if action == "up":
+        # Uploaded Logic
+        text_for_user = f"✅ **Request Completed!**\n\nApki movie **{movie_name}** upload kar di gayi hai. Ab aap bot par search kar sakte hain."
+        text_for_admin = f"✅ Request marked as **Uploaded** for {movie_name}."
+        
+    elif action == "rej":
+        # Rejected Logic
+        text_for_user = f"❌ **Request Rejected!**\n\nApki request **{movie_name}** reject kar di gayi hai. (Possible reasons: Spam, Incorrect name, or Unavailable)."
+        text_for_admin = f"❌ Request marked as **Rejected** for {movie_name}."
+        
+    elif action == "nore":
+        # Not Released Logic
+        text_for_user = f"⚠️ **Not Released Yet!**\n\nSorry, **{movie_name}** abhi release nahi hui hai ya High Quality mein available nahi hai."
+        text_for_admin = f"⚠️ Request marked as **Not Released** for {movie_name}."
+
+    # User ko notification bhejein
+    try:
+        await client.send_message(chat_id=user_id, text=text_for_user)
+    except Exception as e:
+        await query.answer("User ne bot block kiya hai ya message nahi ja raha.", show_alert=True)
+        return
+
+    # Admin panel ka message edit karein
+    await query.message.edit_text(
+        text=query.message.text + f"\n\n➖➖➖➖➖➖➖\n{text_for_admin}",
+        reply_markup=None # Buttons hata denge
+    )
+    await query.answer("User notified!")
+
+# ---------------- REQUEST MOVIE SYSTEM END ---------------- #
 
 @Client.on_message(
     filters.private & 
