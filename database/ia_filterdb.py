@@ -33,10 +33,8 @@ class Media(Document):
 
 async def save_file(media):
     """Save file in database"""
-    # TODO: Find better way to get same file_id for same media to avoid duplicates
     file_id, file_ref = unpack_new_file_id(media.file_id)
     file_name = re.sub(r"(_|\-|\.|\+)", " ", str(media.file_name))
-    
     try:
         file = Media(
             file_id=file_id,
@@ -88,51 +86,36 @@ async def get_search_results(query, file_type=None, max_results=10, offset=0, fi
     # --- 1. First Try: Exact/Strict Regex Search ---
     total_results = await Media.count_documents(filter_dict)
     cursor = Media.find(filter_dict)
-    # Sort by recent
     cursor.sort('$natural', -1)
-    # Slice files according to offset and max results
     cursor.skip(offset).limit(max_results)
-    # Get list of files
     files = await cursor.to_list(length=max_results)
 
-    # If files found using strict search, return them immediately
     if files:
         next_offset = offset + max_results
         if next_offset > total_results:
             next_offset = ''
         return files, next_offset, total_results
 
-    # --- 2. Second Try: Smart Fuzzy Search (If Exact Failed) ---
-    # Logic: 50% similarity match
+    # --- 2. Second Try: Broader Fuzzy Search (If Exact Failed) ---
+    # Logic: Fetch files starting with the same letter as query, then check similarity.
     
-    # Break query into words (e.g. "Stanger Things" -> ["Stanger", "Things"])
-    words = query.split()
-    if len(words) > 0:
-        # Create a looser regex: Find files containing ANY of the words from the query
-        # This filters the DB down to relevant files before we check similarity
-        search_words = [re.escape(word) for word in words if len(word) > 2]
-        
-        if not search_words:
-            return [], '', 0
-            
-        loose_pattern = "|".join(search_words)
+    if len(query) > 0:
+        first_char = query[0]
+        # Regex to match files starting with the same letter (case insensitive)
         try:
-            loose_regex = re.compile(loose_pattern, flags=re.IGNORECASE)
+            start_regex = re.compile(f'^{re.escape(first_char)}', flags=re.IGNORECASE)
         except:
             return [], '', 0
 
-        if USE_CAPTION_FILTER:
-            loose_filter = {'$or': [{'file_name': loose_regex}, {'caption': loose_regex}]}
-        else:
-            loose_filter = {'file_name': loose_regex}
-
+        # We fetch up to 300 recent files starting with that letter to check similarity
+        # This solves "kalki2025" (starts with k) matching "Kalki" (starts with K)
+        loose_filter = {'file_name': start_regex}
         if file_type:
             loose_filter['file_type'] = file_type
 
-        # Fetch potential candidates (Limit to 200 to save memory/speed)
         cursor = Media.find(loose_filter)
-        cursor.sort('$natural', -1)
-        potential_files = await cursor.to_list(length=200)
+        cursor.sort('$natural', -1) # Check newest files first
+        potential_files = await cursor.to_list(length=300) # Limit to avoid lag
 
         final_files = []
         for file in potential_files:
@@ -142,20 +125,20 @@ async def get_search_results(query, file_type=None, max_results=10, offset=0, fi
             # 2. Check similarity removing spaces (Fixes "Kal ki" vs "Kalki")
             ratio2 = difflib.SequenceMatcher(None, query.replace(" ", "").lower(), file.file_name.replace(" ", "").lower()).ratio()
             
-            # Use the better score of the two
+            # Use the better score
             score = max(ratio, ratio2)
             
-            # Threshold set to 50% (0.5) as requested
+            # Threshold set to 50% (0.5)
             if score >= 0.50:
                 final_files.append((file, score))
 
-        # Sort results by best match score (highest score first)
+        # Sort results by best match score
         final_files.sort(key=lambda x: x[1], reverse=True)
         
-        # Extract just the file objects
+        # Extract file objects
         sorted_files = [x[0] for x in final_files]
 
-        # Handle Pagination manually since we sorted in Python
+        # Pagination logic
         total_results = len(sorted_files)
         files = sorted_files[offset:offset+max_results]
         next_offset = offset + max_results
@@ -176,7 +159,6 @@ async def get_file_details(query):
 def encode_file_id(s: bytes) -> str:
     r = b""
     n = 0
-
     for i in s + bytes([22]) + bytes([4]):
         if i == 0:
             n += 1
@@ -184,9 +166,7 @@ def encode_file_id(s: bytes) -> str:
             if n:
                 r += b"\x00" + bytes([n])
                 n = 0
-
             r += bytes([i])
-
     return base64.urlsafe_b64encode(r).decode().rstrip("=")
 
 def encode_file_ref(file_ref: bytes) -> str:
