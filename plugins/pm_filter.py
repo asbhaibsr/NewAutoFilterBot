@@ -8,7 +8,7 @@ import pyrogram
 from database.connections_mdb import active_connection, all_connections, delete_connection, if_active, make_active, \
     make_inactive
 from info import ADMINS, AUTH_CHANNEL, AUTH_USERS, CUSTOM_FILE_CAPTION, AUTH_GROUPS, P_TTI_SHOW_OFF, IMDB, \
-    SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE, LINK_MODE
+    SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE, LINK_MODE, BOT_PM_USERNAME
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait, UserIsBlocked, MessageNotModified, PeerIdInvalid
@@ -30,8 +30,6 @@ SPELL_CHECK = {}
 
 # New sticker ID and bot username (as per your request)
 SEARCHING_STICKER = "CAACAgUAAxkBAAEEaHpo6o_5KBv3tkax9p9ZUJ3I2D95KAACBAADwSQxMYnlHW4Ls8gQHgQ"
-BOT_PM_USERNAME = "As_freefilterBot"
-
 
 @Client.on_message(filters.group & filters.text & filters.incoming)
 async def give_filter(client, message):
@@ -47,8 +45,7 @@ async def give_filter(client, message):
         try:
             await sticker_message.delete()
         except:
-            pass # Sticker might be deleted already if it was a manual filter with a file
-
+            pass
 
 @Client.on_callback_query(filters.regex(r"^next"))
 async def next_page(bot, query):
@@ -73,12 +70,14 @@ async def next_page(bot, query):
     if not files:
         return
     settings = await get_settings(query.message.chat.id)
+    pre = 'filep' if settings['file_secure'] else 'file'
+    
     if settings['button']:
         btn = [
             [
-                # Added file emoji and size in single button mode
                 InlineKeyboardButton(
-                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'files#{file.file_id}'
+                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", 
+                    callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
             for file in files
@@ -87,12 +86,12 @@ async def next_page(bot, query):
         btn = [
             [
                 InlineKeyboardButton(
-                    text=f"{file.file_name}", callback_data=f'files#{file.file_id}'
+                    text=f"{file.file_name}", 
+                    callback_data=f'{pre}#{file.file_id}'
                 ),
-                # Added file emoji in size button
                 InlineKeyboardButton(
                     text=f"📁 {get_size(file.file_size)}",
-                    callback_data=f'files_#{file.file_id}',
+                    callback_data=f'{pre}#{file.file_id}',
                 ),
             ]
             for file in files
@@ -104,31 +103,35 @@ async def next_page(bot, query):
         off_set = None
     else:
         off_set = offset - 10
-        
-    # Add PM button to the last page with new text
+
+    # Add PM button with new text
     pm_button = [InlineKeyboardButton("(⋆. 𐙚˚࿔ 𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 𝘁𝗼 𝗴𝗲𝘁 𝘁𝗵𝗲 𝗳𝗶𝗹𝗲 ᯓᡣ𐭩˚⋆)", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
     if n_offset == 0:
         btn.append(
-            [InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
-             InlineKeyboardButton(f"📃 Pages {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}",
-                                  callback_data="pages")]
+            [
+                InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
+                InlineKeyboardButton(f"📃 Pages {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages")
+            ]
         )
     elif off_set is None:
         btn.append(
-            [InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
-             InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")])
+            [
+                InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
+                InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")
+            ]
+        )
     else:
         btn.append(
             [
                 InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
                 InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
                 InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")
-            ],
+            ]
         )
     
     # Add PM button to the last row
-    btn.append(pm_button) 
+    btn.append(pm_button)
 
     try:
         await query.edit_message_reply_markup(
@@ -138,19 +141,16 @@ async def next_page(bot, query):
         pass
     await query.answer()
 
-
 @Client.on_callback_query(filters.regex(r"^spolling"))
 async def advantage_spoll_choker(bot, query):
     _, user, movie_ = query.data.split('#')
     if int(user) != 0 and query.from_user.id != int(user):
         return await query.answer("oKda", show_alert=True)
     if movie_ == "close_spellcheck":
-        # Edit message before deleting
         await query.message.edit_text("❌ ᴄʟᴏsᴇᴅ sᴘᴇʟʟ ᴄʜᴇᴄᴋ ❌")
         await asyncio.sleep(2)
         try:
             await query.message.delete()
-            # User ka message delete NAHI karo - NOT FOUND CASE
         except Exception:
             pass
         return
@@ -161,12 +161,10 @@ async def advantage_spoll_choker(bot, query):
         
     movie = movies[(int(movie_))]
     
-    # Show message that bot is checking
     checking_msg = await query.message.edit_text(f'🔍 ᴄʜᴇᴄᴋɪɴɢ ꜰᴏʀ: **{movie}** ɪɴ ᴅᴀᴛᴀʙᴀsᴇ... ⏳')
     
     k = await manual_filters(bot, query.message.reply_to_message, text=movie, is_spellcheck=True)
     
-    # Custom not found message with button
     not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -183,7 +181,6 @@ Search other bot
             k = (movie, files, offset, total_results)
             await auto_filter(bot, query, k, is_spellcheck_result=True)
         else:
-            # Create inline button for other bot
             other_bot_button = InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔍 Search Other Bot", url="t.me/asfilter_bot")
             ]])
@@ -192,21 +189,16 @@ Search other bot
                 not_found_msg, 
                 reply_markup=other_bot_button
             )
-            # Delete only bot's message after 2 minutes (120 seconds)
-            # USER KA MESSAGE DELETE NAHI HOGA - NOT FOUND CASE
             await asyncio.sleep(120)
             try:
                 await final_msg.delete()
-                # User ka message delete NAHI karo - NOT FOUND CASE
             except Exception:
                 pass
     else:
-        # If manual filter worked, delete the checking message.
         try:
             await checking_msg.delete()
         except Exception:
             pass
-
 
 @Client.on_callback_query()
 async def cb_handler(client: Client, query: CallbackQuery):
@@ -397,7 +389,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
             alert = alert.replace("\\n", "\n").replace("\\t", "\t")
             await query.answer(alert, show_alert=True)
             
-    # CORRECTED FILE SENDING SECTION WITH GROUP NOTIFICATION
     elif query.data.startswith("file"):
         ident, file_id = query.data.split("#")
         files_ = await get_file_details(file_id)
@@ -421,18 +412,14 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if f_caption is None:
             f_caption = f"{files.file_name}"
 
-        # Check if the user is subscribed to the AUTH_CHANNEL
         if AUTH_CHANNEL and not await is_subscribed(client, query):
-            # If not subscribed, show a pop-up with a link to the bot
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start=subscribe")
             return
             
         try:
-            # FIRST: Show popup message in group that file is being sent to PM
             group_notification = "✅ फ़ाइल आपके PM में भेजी जा रही है...\n\n✅ File is being sent to your PM..."
             await query.answer(group_notification, show_alert=True)
             
-            # SECOND: Try to send the file to the user's PM
             pm_message = await client.send_cached_media(
                 chat_id=query.from_user.id,
                 file_id=file_id,
@@ -440,7 +427,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 protect_content=True if ident == "filep" else False 
             )
             
-            # THIRD: Send the warning message in PM with updated text
             pm_warning_message = """
 Hello,
 
@@ -457,19 +443,17 @@ Hello,
                 reply_to_message_id=pm_message.id
             )
             
-            # FOURTH: Send success message in group that will auto-delete after 3 seconds
             success_msg = await query.message.reply_text(
                 f"✅ फ़ाइल {query.from_user.mention} के PM में भेज दी गई है!\n\n✅ File has been sent to {query.from_user.mention}'s PM!"
             )
             
-            # Schedule deletion of messages
-            await asyncio.sleep(3)  # Delete group success message after 3 seconds
+            await asyncio.sleep(3)
             try:
                 await success_msg.delete()
             except Exception:
                 pass
                 
-            await asyncio.sleep(297)  # Wait remaining time for PM messages (total 5 minutes)
+            await asyncio.sleep(297)
             try:
                 await pm_message.delete()
                 await warning_msg.delete()
@@ -477,13 +461,10 @@ Hello,
                 pass
             
         except UserIsBlocked:
-            # If the user has blocked the bot
             await query.answer('आपने बॉट को ब्लॉक किया हुआ है। कृपया अनब्लॉक करें।', show_alert=True)
         except PeerIdInvalid:
-            # If the user has not started the bot yet
             await query.answer(url=f"https://t.me/{temp.U_NAME}?start={ident}_{file_id}")
         except Exception as e:
-            # For any other errors
             logger.exception(e)
             await query.answer(f"An error occurred: {e}", show_alert=True)
             
@@ -511,10 +492,8 @@ Hello,
             f_caption = f"{title}"
         await query.answer()
         
-        # Show popup that file is being sent
         await query.answer("✅ फ़ाइल आपके PM में भेजी जा रही है...", show_alert=True)
         
-        # Send PM file
         pm_message = await client.send_cached_media(
             chat_id=query.from_user.id,
             file_id=file_id,
@@ -522,7 +501,6 @@ Hello,
             protect_content=True if ident == 'checksubp' else False
         )
         
-        # Send separate PM message
         pm_warning_message = """
 Hello,
 
@@ -539,19 +517,16 @@ Hello,
             reply_to_message_id=pm_message.id
         )
         
-        # Send group success message
         success_msg = await query.message.reply_text(
             f"✅ फ़ाइल {query.from_user.mention} के PM में भेज दी गई है!"
         )
         
-        # Delete group message after 3 seconds
         await asyncio.sleep(3)
         try:
             await success_msg.delete()
         except Exception:
             pass
         
-        # Delete PM file and warning message after 5 minutes
         await asyncio.sleep(297)
         try:
             await pm_message.delete()
@@ -776,11 +751,9 @@ Hello,
             await query.message.edit_reply_markup(reply_markup)
     await query.answer('Piracy Is Crime')
 
-
 async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_spellcheck_result=False):
     # Determine the message object to use
     if is_spellcheck_result:
-        # For spellcheck result, use the original message that was replied to
         message = msg.message.reply_to_message if msg.message.reply_to_message else msg.message
     else:
         message = msg
@@ -793,7 +766,7 @@ async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_
                     await sticker_msg.delete()
                 except:
                     pass
-            return  # ignore commands
+            return
         if re.findall("((^\/|^,|^!|^\.|^[\U0001F600-\U000E007F]).*)", message.text):
             if sticker_msg: 
                 try:
@@ -803,19 +776,27 @@ async def auto_filter(client, msg, spoll=False, sticker_msg: Message = None, is_
             return
         if 2 < len(message.text) < 100:
             search = message.text
-            
-            # First try exact search
             files, offset, total_results = await get_search_results(search.lower(), offset=0, filter=True)
             
-            # Delete sticker immediately after getting search results
             if sticker_msg: 
                 try:
                     await sticker_msg.delete() 
                 except:
                     pass
             
-            # Custom not found message with button
-            not_found_msg = """
+            if not files:
+                corrected_search = await correct_spelling(search)
+                
+                if corrected_search and corrected_search.lower() != search.lower():
+                    files, offset, total_results = await get_search_results(corrected_search.lower(), offset=0, filter=True)
+                    
+                    if files:
+                        search = corrected_search
+                    else:
+                        if settings["spell_check"]:
+                            return await advantage_spell_chok(msg)
+                        else:
+                            not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
 SORRY, we haven't find your file. Maybe you made a mistake? Please try to write correctly 😊 
@@ -824,58 +805,42 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 
 Search other bot
 """
-            
-            # Create inline button for other bot
-            other_bot_button = InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔍 Search Other Bot", url="t.me/asfilter_bot")
-            ]])
-
-            if not files:
-                # Try spelling correction
-                corrected_search = await correct_spelling(search)
-                
-                if corrected_search and corrected_search.lower() != search.lower():
-                    # Try with corrected spelling
-                    files, offset, total_results = await get_search_results(corrected_search.lower(), offset=0, filter=True)
-                    
-                    if files:
-                        # Show that we're using corrected spelling
-                        search = corrected_search
-                    else:
-                        if settings["spell_check"]:
-                            # Pass the original message for spell check
-                            return await advantage_spell_chok(msg)
-                        else:
-                            # Send custom not found message with button
+                            other_bot_button = InlineKeyboardMarkup([[
+                                InlineKeyboardButton("🔍 Search Other Bot", url="t.me/asfilter_bot")
+                            ]])
                             k = await message.reply(
                                 not_found_msg, 
                                 reply_markup=other_bot_button
                             )
-                            # Delete only bot's message after 2 minutes (120 seconds)
-                            # USER KA SEARCH MESSAGE DELETE NAHI HOGA - NOT FOUND CASE
                             await asyncio.sleep(120)
                             try:
                                 await k.delete()
-                                # USER KA MESSAGE DELETE NAHI KARO - NOT FOUND CASE
                             except Exception:
                                 pass
                             return
                 else:
                     if settings["spell_check"]:
-                        # Pass the original message for spell check
                         return await advantage_spell_chok(msg)
                     else:
-                        # Send custom not found message with button
+                        not_found_msg = """
+क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
+
+SORRY, we haven't find your file. Maybe you made a mistake? Please try to write correctly 😊 
+
+●■●■●■●■●■●■●■
+
+Search other bot
+"""
+                        other_bot_button = InlineKeyboardMarkup([[
+                            InlineKeyboardButton("🔍 Search Other Bot", url="t.me/asfilter_bot")
+                        ]])
                         k = await message.reply(
                             not_found_msg, 
                             reply_markup=other_bot_button
                         )
-                        # Delete only bot's message after 2 minutes (120 seconds)
-                        # USER KA SEARCH MESSAGE DELETE NAHI HOGA - NOT FOUND CASE
                         await asyncio.sleep(120)
                         try:
                             await k.delete()
-                            # USER KA MESSAGE DELETE NAHI KARO - NOT FOUND CASE
                         except Exception:
                             pass
                         return
@@ -887,44 +852,143 @@ Search other bot
                     pass
             return
     else:
-        # If it's a result from spell check
         settings = await get_settings(message.chat.id)
         search, files, offset, total_results = spoll
     
     pre = 'filep' if settings['file_secure'] else 'file'
     
-    # ============ LINK MODE VS BUTTON MODE CODE START ============
+    # --- IMPORTANT: CUSTOM CAPTION FOR BOTH MODES ---
+    try:
+        req_by = message.from_user.mention
+    except:
+        req_by = "User"
+    try:
+        group_title = message.chat.title
+    except:
+        group_title = "Group"
+        
+    custom_caption = f"""
+📂 ʜᴇʀᴇ ɪ ꜰᴏᴜɴᴅ ꜰᴏʀ ʏᴏᴜʀ sᴇᴀʀᴄʜ - **{search}**
+
+📢 ʀᴇǫᴜᴇꜱᴛᴇᴅ ʙʏ - {req_by}
+♾️ ᴘᴏᴡᴇᴇᴅ ʙʏ - {group_title}
+"""
     
-    # Agar Link Mode ON hai (Info.py se)
+    # --- LINK MODE HANDLING ---
     if LINK_MODE:
-        msg_text = f"📂 **Results for:** `{search}`\n\n"
-
+        # LINK MODE: Text mein links add honge, Buttons mein nahi
+        custom_caption += "\n**🍿 Your Movie Files 👇**\n\n"
         for file in files:
-            # Deep Link Generator
             link = f"https://t.me/{temp.U_NAME}?start={pre}_{file.file_id}"
-
-            # Text Format: 🎥 Movie Name [Size]
-            msg_text += f"🎥 <a href='{link}'>{file.file_name}</a>\n💾 Size: {get_size(file.file_size)}\n\n"
-
-        msg_text += f"⚡ Powered by {temp.B_NAME}"
-
-        # Poster ke sath ya bina poster ke bhejna
-        imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
-
-        if imdb and imdb.get('poster'):
-            await message.reply_photo(photo=imdb.get('poster'), caption=msg_text[:1024])
+            custom_caption += f"🎬 **[{file.file_name}]({link})**\n📁 Size: {get_size(file.file_size)}\n\n"
+        
+        custom_caption += f"⚡ Powered by {temp.B_NAME}"
+        
+        # PM Button for Link Mode
+        pm_button = [InlineKeyboardButton("(⋆. 𐙚˚࿔ 𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 𝘁𝗼 𝗴𝗲𝘁 𝘁𝗵𝗲 𝗳𝗶𝗹𝗲 ᯓᡣ𐭩˚⋆)", url=f"https://t.me/{BOT_PM_USERNAME}")]
+        btn = [pm_button]
+        
+        # Pagination for Link Mode
+        if offset != "":
+            key = f"{message.chat.id}-{message.id}"
+            BUTTONS[key] = search
+            req = message.from_user.id if message.from_user else 0
+            btn.append(
+                [InlineKeyboardButton(text=f"🗓 1/{math.ceil(int(total_results) / 10)}", callback_data="pages"),
+                 InlineKeyboardButton(text="NEXT ⏩", callback_data=f"next_{req}_{key}_{offset}")]
+            )
         else:
-            await message.reply_text(msg_text, disable_web_page_preview=True)
-        return # Yahan se wapas laut jayenge, niche ka button code run nahi hoga
-    
-    # ============ LINK MODE VS BUTTON MODE CODE END ============
-    
-    # Agar Link Mode OFF hai (Button Mode)
+            btn.append(
+                [InlineKeyboardButton(text="🗓 1/1", callback_data="pages")]
+            )
+        
+        imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
+        TEMPLATE = settings.get('template', IMDB_TEMPLATE)
+        
+        if imdb:
+            cap = TEMPLATE.format(
+                query=search,
+                title=imdb['title'],
+                votes=imdb['votes'],
+                aka=imdb["aka"],
+                seasons=imdb["seasons"],
+                box_office=imdb['box_office'],
+                localized_title=imdb['localized_title'],
+                kind=imdb['kind'],
+                imdb_id=imdb["imdb_id"],
+                cast=imdb["cast"],
+                runtime=imdb["runtime"],
+                countries=imdb["countries"],
+                certificates=imdb["certificates"],
+                languages=imdb["languages"],
+                director=imdb["director"],
+                writer=imdb["writer"],
+                producer=imdb["producer"],
+                composer=imdb["composer"],
+                cinematographer=imdb["cinematographer"],
+                music_team=imdb["music_team"],
+                distributors=imdb["distributors"],
+                release_date=imdb['release_date'],
+                year=imdb['year'],
+                genres=imdb['genres'],
+                poster=imdb['poster'],
+                plot=imdb['plot'],
+                rating=imdb['rating'],
+                url=imdb['url'],
+                **locals()
+            )
+            # Bold links ke liye HTML formatting
+            final_caption = custom_caption.replace("**", "<b>").replace("**", "</b>") + "\n" + cap
+        else:
+            final_caption = custom_caption.replace("**", "<b>").replace("**", "</b>")
+        
+        # Send Message for Link Mode
+        if imdb and imdb.get('poster'):
+            try:
+                result_msg = await message.reply_photo(
+                    photo=imdb.get('poster'), 
+                    caption=final_caption[:1024], 
+                    reply_markup=InlineKeyboardMarkup(btn),
+                    parse_mode=enums.ParseMode.HTML
+                )
+            except Exception as e:
+                logger.exception(e)
+                result_msg = await message.reply_text(
+                    final_caption, 
+                    reply_markup=InlineKeyboardMarkup(btn), 
+                    disable_web_page_preview=True,
+                    parse_mode=enums.ParseMode.HTML
+                )
+        else:
+            result_msg = await message.reply_text(
+                final_caption, 
+                reply_markup=InlineKeyboardMarkup(btn), 
+                disable_web_page_preview=True,
+                parse_mode=enums.ParseMode.HTML
+            )
+        
+        # Delete after 5 minutes
+        await asyncio.sleep(300)
+        try:
+            await result_msg.delete()
+            await message.delete()
+        except Exception:
+            pass
+        
+        if is_spellcheck_result:
+            try:
+                await msg.message.delete()
+            except:
+                pass
+        return
+        
+    # --- BUTTON MODE HANDLING ---
     if settings["button"]:
         btn = [
             [
                 InlineKeyboardButton(
-                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'{pre}#{file.file_id}'
+                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", 
+                    callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
             for file in files
@@ -961,29 +1025,9 @@ Search other bot
         )
     
     # Add PM button to the last row
-    btn.append(pm_button) 
+    btn.append(pm_button)
 
     imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
-    
-    # Custom Caption setup
-    try:
-        req_by = message.from_user.mention
-    except:
-        req_by = "User"
-    try:
-        group_title = message.chat.title
-    except:
-        group_title = "Group"
-        
-    # The new result message template
-    custom_caption = f"""
-📂 ʜᴇʀᴇ ɪ ꜰᴏᴜɴᴅ ꜰᴏʀ ʏᴏᴜʀ sᴇᴀʀᴄʜ - **{search}**
-
-📢 ʀᴇǫᴜᴇꜱᴛᴇᴅ ʙʏ - {req_by}
-♾️ ᴘᴏᴡᴇᴇᴅ ʙʏ - {group_title}
-
-🍿 Your Movie Files 👇
-"""
     
     TEMPLATE = settings.get('template', IMDB_TEMPLATE)
     
@@ -1019,76 +1063,76 @@ Search other bot
             url=imdb['url'],
             **locals()
         )
-        # Prepend custom header to IMDB caption
         cap = custom_caption + "\n" + cap
         
     else:
-        # Use custom header for non-IMDB caption
-        cap = custom_caption
+        cap = custom_caption + "\n\n**👇 Click Below Buttons to Get Files**"
         
     if imdb and imdb.get('poster'):
         try:
-            # Send photo and then delete the result message after 5 minutes
-            result_msg = await message.reply_photo(photo=imdb.get('poster'), caption=cap[:1024],
-                                      reply_markup=InlineKeyboardMarkup(btn))
+            result_msg = await message.reply_photo(
+                photo=imdb.get('poster'), 
+                caption=cap[:1024],
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
             
-            await asyncio.sleep(300)  # 5 minutes
+            await asyncio.sleep(300)
             try:
-                await result_msg.delete()  # Bot ka result delete
-                # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
-                await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
+                await result_msg.delete()
+                await message.delete()
             except Exception:
                 pass
             
         except (MediaEmpty, PhotoInvalidDimensions, WebpageMediaEmpty):
             pic = imdb.get('poster')
             poster = pic.replace('.jpg', "._V1_UX360.jpg")
-            # Send photo and then delete the result message after 5 minutes
-            result_msg = await message.reply_photo(photo=poster, caption=cap[:1024], reply_markup=InlineKeyboardMarkup(btn))
+            result_msg = await message.reply_photo(
+                photo=poster, 
+                caption=cap[:1024], 
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
             
-            await asyncio.sleep(300)  # 5 minutes
+            await asyncio.sleep(300)
             try:
-                await result_msg.delete()  # Bot ka result delete
-                # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
-                await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
+                await result_msg.delete()
+                await message.delete()
             except Exception:
                 pass
             
         except Exception as e:
             logger.exception(e)
-            # Send text and then delete the result message after 5 minutes
-            result_msg = await message.reply_text(cap, reply_markup=InlineKeyboardMarkup(btn))
+            result_msg = await message.reply_text(
+                cap, 
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
             
-            await asyncio.sleep(300)  # 5 minutes
+            await asyncio.sleep(300)
             try:
-                await result_msg.delete()  # Bot ka result delete
-                # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
-                await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
+                await result_msg.delete()
+                await message.delete()
             except Exception:
                 pass
             
     else:
-        # Send text and then delete the result message after 5 minutes
-        result_msg = await message.reply_text(cap, reply_markup=InlineKeyboardMarkup(btn))
+        result_msg = await message.reply_text(
+            cap, 
+            reply_markup=InlineKeyboardMarkup(btn)
+        )
         
-        await asyncio.sleep(300)  # 5 minutes
+        await asyncio.sleep(300)
         try:
-            await result_msg.delete()  # Bot ka result delete
-            # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
-            await message.delete()     # USER KA SEARCH MESSAGE DELETE ✅
+            await result_msg.delete()
+            await message.delete()
         except Exception:
             pass
         
     if is_spellcheck_result:
-        # Delete the spell-check message (the one showing the options) if it was a result from a callback query
         try:
             await msg.message.delete()
         except Exception:
             pass
 
-
 async def advantage_spell_chok(msg):
-    # Turant reply dena taaki user ko lage bot kaam kar raha hai
     processing_msg = await msg.reply_text('🧐 **Checking spelling...** Please wait ⏳')
     
     query = re.sub(r"\b(pl(i|e)*?(s|z+|ease|se|ese|(e+)s(e)?)|movie|find|send|get|full).*","", msg.text, flags=re.IGNORECASE).strip()
@@ -1098,7 +1142,6 @@ async def advantage_spell_chok(msg):
 
     g_s = await search_gagala(query)
     
-    # Custom not found message with button
     not_found_msg = """
 क्षमा करें,हमें आपकी फ़ाइल नहीं मिली। हो सकता है कि आपने स्पेलिंग सही नही लिखी हो? कृपया सही ढंग से लिखने का प्रयास करें 🙌
 
@@ -1109,7 +1152,6 @@ SORRY, we haven't find your file. Maybe you made a mistake? Please try to write 
 Search other bot
 """
     
-    # Create inline button for other bot
     other_bot_button = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔍 Search Other Bot", url="t.me/asfilter_bot")
     ]])
@@ -1119,15 +1161,13 @@ Search other bot
             not_found_msg, 
             reply_markup=other_bot_button
         )
-        await asyncio.sleep(120)  # 2 minutes
+        await asyncio.sleep(120)
         try:
             await final_msg.delete()
-            # User message delete NAHI karo - NOT FOUND CASE
         except:
             pass
         return
 
-    # Suggestions nikalna
     movielist = []
     gs_parsed = []
     regex = re.compile(r".*(imdb|wikipedia).*", re.IGNORECASE)
@@ -1156,16 +1196,14 @@ Search other bot
     movielist += [(re.sub(r'(\-|\(|\)|_)', '', i, flags=re.IGNORECASE)).strip() for i in gs_parsed]
     movielist = list(dict.fromkeys(movielist))
     
-    # Stop and send not found message if no movie suggestions found
     if not movielist:
         final_msg = await processing_msg.edit_text(
             not_found_msg, 
             reply_markup=other_bot_button
         )
-        await asyncio.sleep(120)  # 2 minutes
+        await asyncio.sleep(120)
         try:
             await final_msg.delete()
-            # User message delete NAHI karo - NOT FOUND CASE
         except:
             pass
         return
@@ -1179,22 +1217,20 @@ Search other bot
     ] for k, movie in enumerate(movielist)]
     btn.append([InlineKeyboardButton(text="❌ ᴄʟᴏsᴇ sᴘᴇʟʟ ᴄʜᴇᴄᴋ ❌", callback_data=f'spolling#{user}#close_spellcheck')])
     
-    # Edit the processing message to show the spell check options
-    await processing_msg.edit_text("🤔 ɪ ᴄᴏᴜʟᴅɴ'ᴛ ꜰɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\n\n**ᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏꜰ ᴛʜᴇsᴇ?**",
-                                   reply_markup=InlineKeyboardMarkup(btn))
-
+    await processing_msg.edit_text(
+        "🤔 ɪ ᴄᴏᴜʟᴅɴ'ᴛ ꜰɪɴᴅ ᴀɴʏᴛʜɪɴɢ ʀᴇʟᴀᴛᴇᴅ ᴛᴏ ᴛʜᴀᴛ\n\n**ᴅɪᴅ ʏᴏᴜ ᴍᴇᴀɴ ᴀɴʏ ᴏɴᴇ ᴏꜰ ᴛʜᴇsᴇ?**",
+        reply_markup=InlineKeyboardMarkup(btn)
+    )
 
 async def manual_filters(client, message, text=False, sticker_msg: Message = None, is_spellcheck=False):
     group_id = message.chat.id
     name = text or message.text
-    # Get the ID of the original message to reply to, or the new message ID if no reply is available.
     reply_id = message.reply_to_message.id if message.reply_to_message and not is_spellcheck else message.id
     keywords = await get_filters(group_id)
     
-    if is_spellcheck: # For spell check manual filter, reply to the original user's message
+    if is_spellcheck:
         reply_id = message.id
         
-    # Delete sticker before sending the manual filter response
     if sticker_msg: 
         try:
             await sticker_msg.delete()
@@ -1239,31 +1275,23 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
                             reply_to_message_id=reply_id
                         )
                         
-                    # Delete the result message after 5 minutes (300 seconds)
                     await asyncio.sleep(300)
                     try:
                         await result_msg.delete()
-                        # USER KA SEARCH MESSAGE DELETE HONA CHAHIYE - MOVIE MIL GAYI ✅
                         await message.delete()
                     except Exception:
                         pass
                     
                 except Exception as e:
                     logger.exception(e)
-                return True # Return True if manual filter was found and sent
+                return True
     else:
-        return False # Return False if no manual filter was found
-
+        return False
 
 async def correct_spelling(search_term):
-    """
-    Function to correct spelling mistakes in search term
-    """
     try:
-        # Remove extra spaces
         search_term = ' '.join(search_term.split())
         
-        # Common spelling corrections dictionary
         corrections = {
             'avangers': 'avengers',
             'avngers': 'avengers',
@@ -1321,17 +1349,14 @@ async def correct_spelling(search_term):
             'shrek': 'shrek',
         }
         
-        # Check if search term needs correction
         lower_term = search_term.lower()
         if lower_term in corrections:
             return corrections[lower_term]
         
-        # Try to match with common patterns
         for wrong, correct in corrections.items():
             if wrong in lower_term:
                 return correct
         
-        # If no correction found, return original
         return search_term
         
     except Exception as e:
