@@ -71,72 +71,109 @@ async def next_page(bot, query):
         return
     settings = await get_settings(query.message.chat.id)
     pre = 'filep' if settings['file_secure'] else 'file'
-    
-    if settings['button']:
-        btn = [
-            [
-                InlineKeyboardButton(
-                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", 
-                    callback_data=f'{pre}#{file.file_id}'
-                ),
-            ]
-            for file in files
-        ]
-    else:
-        btn = [
-            [
-                InlineKeyboardButton(
-                    text=f"{file.file_name}", 
-                    callback_data=f'{pre}#{file.file_id}'
-                ),
-                InlineKeyboardButton(
-                    text=f"📁 {get_size(file.file_size)}",
-                    callback_data=f'{pre}#{file.file_id}',
-                ),
-            ]
-            for file in files
-        ]
+    btn = []
 
+    # === LINK MODE LOGIC FOR NEXT PAGE ===
+    if LINK_MODE:
+        # Header banate hain
+        try:
+            req_by = query.from_user.mention
+        except:
+            req_by = "User"
+            
+        # Naya Caption/Text generate karo agle page ke liye
+        msg_text = f"📂 ʜᴇʀᴇ ɪ ꜰᴏᴜɴᴅ ꜰᴏʀ ʏᴏᴜʀ sᴇᴀʀᴄʜ - {search}\n\n📢 ʀᴇǫᴜᴇꜱᴛᴇᴅ ʙʏ - {req_by}\n\n**🍿 Your Movie Files 👇**\n\n"
+        
+        for file in files:
+            link = f"https://t.me/{temp.U_NAME}?start={pre}_{file.file_id}"
+            msg_text += f"🎥 <a href='{link}'>{file.file_name}</a>\n📀 Size: <code>{get_size(file.file_size)}</code>\n\n"
+            
+        msg_text += f"⚡ Powered by {temp.B_NAME}"
+        
+        # Link Mode mein btn list mein files ke button nahi, sirf navigation button honge
+    
+    # === BUTTON MODE LOGIC FOR NEXT PAGE ===
+    else:
+        if settings['button']:
+            btn = [
+                [
+                    InlineKeyboardButton(
+                        text=f"[📁 {get_size(file.file_size)}] {file.file_name}", 
+                        callback_data=f'{pre}#{file.file_id}'
+                    ),
+                ]
+                for file in files
+            ]
+        else:
+            btn = [
+                [
+                    InlineKeyboardButton(
+                        text=f"{file.file_name}", 
+                        callback_data=f'{pre}#{file.file_id}'
+                    ),
+                    InlineKeyboardButton(
+                        text=f"📁 {get_size(file.file_size)}",
+                        callback_data=f'{pre}#{file.file_id}',
+                    ),
+                ]
+                for file in files
+            ]
+
+    # === NAVIGATION BUTTONS (Common for both) ===
+    
     if 0 < offset <= 10:
         off_set = 0
     elif offset == 0:
         off_set = None
     else:
         off_set = offset - 10
-
-    # Add PM button with new text
+        
+    # PM Button
     pm_button = [InlineKeyboardButton("(⋆. 𐙚˚࿔ 𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 𝘁𝗼 𝗴𝗲𝘁 𝘁𝗵𝗲 𝗳𝗶𝗹𝗲 ᯓᡣ𐭩˚⋆)", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
     if n_offset == 0:
         btn.append(
-            [
-                InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
-                InlineKeyboardButton(f"📃 Pages {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages")
-            ]
+            [InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
+             InlineKeyboardButton(f"📃 Pages {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}",
+                                  callback_data="pages")]
         )
     elif off_set is None:
         btn.append(
-            [
-                InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
-                InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")
-            ]
-        )
+            [InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
+             InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")])
     else:
         btn.append(
             [
                 InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
                 InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
                 InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")
-            ]
+            ],
         )
     
-    # Add PM button to the last row
     btn.append(pm_button)
 
+    # === MESSAGE UPDATE LOGIC ===
     try:
-        await query.edit_message_reply_markup(
-            reply_markup=InlineKeyboardMarkup(btn)
-        )
+        if LINK_MODE:
+            # Link mode mein Text/Caption edit karna padta hai
+            if query.message.media: # Agar photo/video hai
+                await query.message.edit_caption(
+                    caption=msg_text,
+                    reply_markup=InlineKeyboardMarkup(btn),
+                    parse_mode=enums.ParseMode.HTML
+                )
+            else: # Agar sirf text hai
+                await query.message.edit_text(
+                    text=msg_text,
+                    reply_markup=InlineKeyboardMarkup(btn),
+                    parse_mode=enums.ParseMode.HTML,
+                    disable_web_page_preview=True
+                )
+        else:
+            # Button mode mein sirf buttons badalte hain
+            await query.edit_message_reply_markup(
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
     except MessageNotModified:
         pass
     await query.answer()
@@ -879,8 +916,12 @@ Search other bot
         # LINK MODE: Text mein links add honge, Buttons mein nahi
         custom_caption += "\n**🍿 Your Movie Files 👇**\n\n"
         for file in files:
+            # Direct start link
             link = f"https://t.me/{temp.U_NAME}?start={pre}_{file.file_id}"
-            custom_caption += f"🎬 **[{file.file_name}]({link})**\n📁 Size: {get_size(file.file_size)}\n\n"
+            
+            # HTML Syntax use kar rahe hain taaki brackets [] se issue na ho
+            # Format: 🎥 Movie Name (Clickable) - [Size]
+            custom_caption += f"🎥 <a href='{link}'>{file.file_name}</a>\n📀 Size: <code>{get_size(file.file_size)}</code>\n\n"
         
         custom_caption += f"⚡ Powered by {temp.B_NAME}"
         
@@ -937,10 +978,10 @@ Search other bot
                 url=imdb['url'],
                 **locals()
             )
-            # Bold links ke liye HTML formatting
-            final_caption = custom_caption.replace("**", "<b>").replace("**", "</b>") + "\n" + cap
+            # HTML formatting ke liye
+            final_caption = custom_caption + "\n" + cap
         else:
-            final_caption = custom_caption.replace("**", "<b>").replace("**", "</b>")
+            final_caption = custom_caption
         
         # Send Message for Link Mode
         if imdb and imdb.get('poster'):
@@ -1205,7 +1246,7 @@ Search other bot
         try:
             await final_msg.delete()
         except:
-            pass
+        pass
         return
         
     SPELL_CHECK[msg.id] = movielist
@@ -1240,7 +1281,7 @@ async def manual_filters(client, message, text=False, sticker_msg: Message = Non
     for keyword in reversed(sorted(keywords, key=len)):
         pattern = r"( |^|[^\w])" + re.escape(keyword) + r"( |$|[^\w])"
         if re.search(pattern, name, flags=re.IGNORECASE):
-            reply_text, btn, alert, fileid = await find_filter(group_id, keyword)
+            reply_text, btn, alerts, fileid = await find_filter(group_id, keyword)
 
             if reply_text:
                 reply_text = reply_text.replace("\\n", "\n").replace("\\t", "\t")
