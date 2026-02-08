@@ -5,11 +5,10 @@ import asyncio
 from Script import script
 from pyrogram import Client, filters, enums
 from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, ChannelInvalid, MessageNotModified
-# ForceReply yahan add kiya gaya hai
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from database.ia_filterdb import Media, get_file_details, unpack_new_file_id
 from database.users_chats_db import db
-from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT, REQUEST_CHANNEL
+from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT, REQUEST_CHANNEL, BOT_PM_USERNAME
 from utils import get_settings, get_size, is_subscribed, save_group_settings, temp
 from database.connections_mdb import active_connection
 import re
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 BATCH_FILES = {}
 
-# यह कंटेंट 'Other Bots' बटन के लिए है
 BOTS_PAGES = [
     # Page 0
     (
@@ -54,8 +52,6 @@ BOTS_PAGES = [
     )
 ]
 
-
-# MODIFIED: यह फंक्शन अब किसी भी मैसेज को दिए गए समय के बाद डिलीट कर सकता है
 async def schedule_delete(message, delay_seconds=300):
     """Deletes the message after a specified delay."""
     await asyncio.sleep(delay_seconds)
@@ -97,7 +93,6 @@ async def start(client, message):
         ],[
             InlineKeyboardButton('🤖 ᴏᴛʜᴇʀ ʙᴏᴛs & ᴄᴏɴᴛᴀᴄᴛ 🤖', callback_data='other_bots_0')
         ],[
-            # Yaha Update button hatakar Request button lagaya gaya hai
             InlineKeyboardButton('📝 ʀᴇǫᴜᴇsᴛ ᴍᴏᴠɪᴇ/sᴇʀɪᴇs', callback_data='request_movie')
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -305,15 +300,36 @@ async def start(client, message):
             f_caption=f_caption
     if f_caption is None:
         f_caption = f"{files.file_name}"
+    
+    # Send the file with caption
     sent_msg = await client.send_cached_media(
         chat_id=message.from_user.id,
         file_id=file_id,
         caption=f_caption,
         protect_content=True if pre == 'filep' else False,
     )
-    asyncio.create_task(schedule_delete(sent_msg, 300))
+    
+    # Send warning message separately
+    warning_text = """
+Hello,
 
-# 'Other Bots' बटन के लिए नया Callback Handler
+⚠️ᴛʜɪs ғɪʟᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ᴀғᴛᴇʀ 5 ᴍɪɴᴜᴛᴇs
+
+ᴘʟᴇᴀsᴇ ғᴏʀᴡᴀʀᴅ ᴛʜᴇ ғɪʟᴇ sᴏᴍᴇᴡʜᴇʀᴇ ʙᴇғᴏʀᴇ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ..
+
+मूवी यहां डाउनलोड ना करे क्योंकि | मूवी 🍿 5 Minutes में डिलीट कर दी जायेगी
+कृपया कही फॉरवर्ड करे के डाउनलोड करे
+"""
+    warn_msg = await client.send_message(
+        chat_id=message.from_user.id,
+        text=warning_text,
+        reply_to_message_id=sent_msg.id
+    )
+    
+    # Schedule deletion of both messages
+    asyncio.create_task(schedule_delete(sent_msg, 300))
+    asyncio.create_task(schedule_delete(warn_msg, 300))
+
 @Client.on_callback_query(filters.regex(r"^other_bots_"))
 async def other_bots_callback(client, query):
     try:
@@ -346,11 +362,10 @@ async def other_bots_callback(client, query):
     except Exception as e:
         logger.error(f"Could not edit message for other_bots: {e}")
 
-# 'Back to Start' बटन के लिए Callback Handler
 @Client.on_callback_query(filters.regex("start_back"))
 async def start_back_callback(client, query):
     buttons = [[
-        InlineKeyboardButton('➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
+        InlineKeyboardButton('➕ ᴀᴅᴇᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘs ➕', url=f'http://t.me/{temp.U_NAME}?startgroup=true')
     ],[
         InlineKeyboardButton('ℹ️ ʜᴇʟᴘ', callback_data='help'),
         InlineKeyboardButton('😊 ᴀʙᴏᴜᴛ', callback_data='about')
@@ -369,11 +384,10 @@ async def start_back_callback(client, query):
     except Exception as e:
         logger.error(f"Error in start_back_callback: {e}")
 
-# ---------------- REQUEST MOVIE SYSTEM START ---------------- #
+# ---------------- REQUEST MOVIE SYSTEM START ----------------
 
 @Client.on_callback_query(filters.regex("request_movie"))
 async def request_movie_click(client, query):
-    # Jab user Request button dabayega
     await query.answer()
     await client.send_message(
         chat_id=query.from_user.id,
@@ -383,20 +397,16 @@ async def request_movie_click(client, query):
         reply_markup=ForceReply(selective=True)
     )
 
-# User ka Reply pakadne ke liye
 @Client.on_message(filters.private & filters.reply)
 async def handle_request_reply(client, message):
-    # Check karein ki ye Request ka hi reply hai ya nahi
     if message.reply_to_message and "Apni Movie/Series ka naam" in message.reply_to_message.text:
         
         request_text = message.text
         user_id = message.from_user.id
         user_mention = message.from_user.mention
         
-        # User ko batayein ki request bhej di gayi hai
         await message.reply_text("✅ **Aapki Request Owner ko bhej di gayi hai!**\nJald hi upload kar di jayegi.")
         
-        # Owner ke liye buttons
         admin_buttons = [
             [
                 InlineKeyboardButton("✅ Uploaded", callback_data=f"reqstatus#up#{user_id}"),
@@ -407,7 +417,6 @@ async def handle_request_reply(client, message):
             ]
         ]
         
-        # Saare Admins ko message bhejein
         notification_text = (
             f"🔔 **New Movie Request!**\n\n"
             f"👤 **User:** {user_mention} (`{user_id}`)\n"
@@ -424,7 +433,6 @@ async def handle_request_reply(client, message):
             except Exception as e:
                 logger.error(f"Failed to send request to admin {admin_id}: {e}")
 
-# Owner jab Button par click karega (Uploaded/Rejected/Not Released)
 @Client.on_callback_query(filters.regex(r"^reqstatus"))
 async def handle_request_status(client, query):
     data = query.data.split("#")
@@ -432,42 +440,36 @@ async def handle_request_status(client, query):
     user_id = int(data[2])
     
     movie_name = "Unknown"
-    # Admin ke message se Movie ka naam nikalne ki koshish (Formatting par depend karta hai)
     try:
         movie_name = query.message.text.split("Request:** `")[1].split("`")[0]
     except:
         pass
 
     if action == "up":
-        # Uploaded Logic
         text_for_user = f"✅ **Request Completed!**\n\nApki movie **{movie_name}** upload kar di gayi hai. Ab aap bot par search kar sakte hain."
         text_for_admin = f"✅ Request marked as **Uploaded** for {movie_name}."
         
     elif action == "rej":
-        # Rejected Logic
         text_for_user = f"❌ **Request Rejected!**\n\nApki request **{movie_name}** reject kar di gayi hai. (Possible reasons: Spam, Incorrect name, or Unavailable)."
         text_for_admin = f"❌ Request marked as **Rejected** for {movie_name}."
         
     elif action == "nore":
-        # Not Released Logic
         text_for_user = f"⚠️ **Not Released Yet!**\n\nSorry, **{movie_name}** abhi release nahi hui hai ya High Quality mein available nahi hai."
         text_for_admin = f"⚠️ Request marked as **Not Released** for {movie_name}."
 
-    # User ko notification bhejein
     try:
         await client.send_message(chat_id=user_id, text=text_for_user)
     except Exception as e:
         await query.answer("User ne bot block kiya hai ya message nahi ja raha.", show_alert=True)
         return
 
-    # Admin panel ka message edit karein
     await query.message.edit_text(
         text=query.message.text + f"\n\n➖➖➖➖➖➖➖\n{text_for_admin}",
-        reply_markup=None # Buttons hata denge
+        reply_markup=None
     )
     await query.answer("User notified!")
 
-# ---------------- GROUP REQUEST SYSTEM START ---------------- #
+# ---------------- GROUP REQUEST SYSTEM START ----------------
 
 @Client.on_message(filters.command("request", prefixes=["/", "#"]) & filters.group)
 async def group_movie_request(client, message):
@@ -481,7 +483,6 @@ async def group_movie_request(client, message):
     group_id = message.chat.id
     message_link = message.link 
     
-    # Stylist Reply to User
     reply_text = (
         f"👋 हेलो {user_mention}!\n\n"
         f"📝 **आपकी रिक्वेस्ट:** `{movie_name}`\n\n"
@@ -491,7 +492,6 @@ async def group_movie_request(client, message):
     )
     await message.reply_text(reply_text)
 
-    # Admin Panel Notification
     admin_text = (
         f"📩 **New Group Request**\n\n"
         f"👤 **User:** {user_mention} (`{user_id}`)\n"
@@ -523,7 +523,6 @@ async def handle_group_request_status(client, query):
     user_id = int(user_id)
     group_id = int(group_id)
     
-    # Movie name nikalne ka try karte hain admin message se
     try:
         movie_name = query.message.text.split("Movie:** `")[1].split("`")[0]
     except:
@@ -539,7 +538,6 @@ async def handle_group_request_status(client, query):
         status_msg = f"⚠️ **Not Released!**\n\nMovie: `{movie_name}`\nस्टेटस: अभी रिलीज़ नहीं हुई है या HD में नहीं है।"
         admin_log = f"⚠️ Request Not Released: {movie_name}"
 
-    # User ko Group mein notification bhejo
     try:
         await client.send_message(
             chat_id=group_id,
@@ -549,24 +547,21 @@ async def handle_group_request_status(client, query):
     except Exception as e:
         await query.answer(f"Error: {e}", show_alert=True)
 
-    # Admin Msg Edit
     await query.message.edit_text(
         query.message.text + f"\n\n➖➖➖➖➖\n{admin_log}",
         reply_markup=None
     )
 
-# ---------------- GROUP REQUEST SYSTEM END ---------------- #
+# ---------------- GROUP REQUEST SYSTEM END ----------------
 
 @Client.on_message(
     filters.private & 
     filters.text & 
     filters.incoming & 
-    ~filters.user(ADMINS) & # Admin ko exclude karein
-    ~filters.command(["start", "help", "settings", "id", "status", "batch", "connect", "disconnect", "stats", "set_template"]) # Specified commands ko exclude karein
+    ~filters.user(ADMINS) & 
+    ~filters.command(["start", "help", "settings", "id", "status", "batch", "connect", "disconnect", "stats", "set_template"])
 )
 async def pm_text_search_handler(client, message):
-    """Handles text messages/commands in PM that are not /start or other whitelisted commands, by suggesting to join the group."""
-    
     buttons = [[
         InlineKeyboardButton('🎬 Free Movie Search Group 🍿', url='https://t.me/freemoviesearchgroup')
     ]]
@@ -589,7 +584,6 @@ async def pm_text_search_handler(client, message):
                     
 @Client.on_message(filters.command('channel') & filters.user(ADMINS))
 async def channel_info(bot, message):
-    """Send basic information of channel"""
     if isinstance(CHANNELS, (int, str)):
         channels = [CHANNELS]
     elif isinstance(CHANNELS, list):
@@ -622,7 +616,6 @@ async def channel_info(bot, message):
 
 @Client.on_message(filters.command('logs') & filters.user(ADMINS))
 async def log_file(bot, message):
-    """Send log file"""
     try:
         await message.reply_document('TelegramBot.log')
     except Exception as e:
@@ -630,7 +623,6 @@ async def log_file(bot, message):
 
 @Client.on_message(filters.command('delete') & filters.user(ADMINS))
 async def delete(bot, message):
-    """Delete file from database"""
     reply = message.reply_to_message
     if reply and reply.media:
         msg = await message.reply("Processing...⏳", quote=True)
