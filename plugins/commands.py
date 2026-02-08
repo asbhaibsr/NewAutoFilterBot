@@ -332,7 +332,7 @@ async def other_bots_callback(client, query):
     if nav_buttons:
         buttons.append(nav_buttons)
     
-    buttons.append([InlineKeyboardButton("🔙 ᴠᴀᴀᴘᴀs", callback_data="start_back")])
+    buttons.append([InlineKeyboardButton("🔙 ᴠᴀᴘᴀs", callback_data="start_back")])
 
     reply_markup = InlineKeyboardMarkup(buttons)
 
@@ -369,7 +369,7 @@ async def start_back_callback(client, query):
     except Exception as e:
         logger.error(f"Error in start_back_callback: {e}")
 
-# ---------------- REQUEST MOVIE SYSTEM START ----------------
+# ---------------- REQUEST MOVIE SYSTEM START ---------------- #
 
 @Client.on_callback_query(filters.regex("request_movie"))
 async def request_movie_click(client, query):
@@ -467,99 +467,95 @@ async def handle_request_status(client, query):
     )
     await query.answer("User notified!")
 
-# ------------------ REQUEST MOVIE SYSTEM START ------------------
+# ---------------- GROUP REQUEST SYSTEM START ---------------- #
 
-@Client.on_message(filters.command("request") | filters.regex(r"^#request"))
-async def request_handler(client, message):
+@Client.on_message(filters.command("request", prefixes=["/", "#"]) & filters.group)
+async def group_movie_request(client, message):
     if len(message.command) < 2:
-        return await message.reply_text("⚠️ <b>Movie/Series ka naam likhna jaruri hai!</b>\n\nExample:\n<code>/request Pushpa 2</code>\n<code>#request Mirzapur</code>")
-
-    # Request content nikalna
-    if message.text.startswith("/request"):
-        request_text = message.text.split(" ", 1)[1]
-    else:
-        request_text = message.text.split(" ", 1)[1]
-
+        return await message.reply_text("⚠️ **उपयोग:** `/request Movie Name`\nExample: `/request Pushpa 2`")
+    
+    movie_name = message.text.split(" ", 1)[1]
     user_id = message.from_user.id
     user_mention = message.from_user.mention
-    chat_id = message.chat.id
+    group_title = message.chat.title
+    group_id = message.chat.id
+    message_link = message.link 
     
-    # Stylist Message for User
-    success_text = (
-        "📩 <b>Aapki Request Owner ke pass bhej di gyi hai.</b>\n\n"
-        "Jab owner request ko dekhenge to aapko yahan notification mil jayegi.\n"
-        "Admin apne kaam main busy bhi rah sakte hai to thoda intzaar karein. ❤️"
+    # Stylist Reply to User
+    reply_text = (
+        f"👋 हेलो {user_mention}!\n\n"
+        f"📝 **आपकी रिक्वेस्ट:** `{movie_name}`\n\n"
+        f"✅ **स्टेटस:** आपकी रिक्वेस्ट ओनर (Owner) के पास भेज दी गई है।\n"
+        f"⏳ कृपया थोड़ा इंतज़ार करें, एडमिन अपने काम में व्यस्त हो सकते हैं।\n"
+        f"🔔 जैसे ही मूवी अपलोड होगी या रिजेक्ट होगी, आपको यहीं नोटिफिकेशन मिल जाएगा।"
     )
-    
-    await message.reply_text(success_text)
+    await message.reply_text(reply_text)
 
-    # Admin/Owner Group Message with Buttons
+    # Admin Panel Notification
     admin_text = (
-        "🔔 <b>New Movie Request!</b>\n\n"
-        f"👤 <b>User:</b> {user_mention} (`{user_id}`)\n"
-        f"🎬 <b>Request:</b> {request_text}\n"
-        f"🏘 <b>Group ID:</b> `{chat_id}`"
+        f"📩 **New Group Request**\n\n"
+        f"👤 **User:** {user_mention} (`{user_id}`)\n"
+        f"🏘 **Group:** {group_title} (`{group_id}`)\n"
+        f"🔗 **Message Link:** [Click Here]({message_link})\n"
+        f"🎬 **Movie:** `{movie_name}`"
     )
 
     buttons = [
         [
-            InlineKeyboardButton("✅ Uploaded", callback_data=f"reqAns#up#{user_id}#{chat_id}"),
-            InlineKeyboardButton("❌ Rejected", callback_data=f"reqAns#rej#{user_id}#{chat_id}")
+            InlineKeyboardButton("✅ Uploaded", callback_data=f"greq#up#{user_id}#{group_id}"),
+            InlineKeyboardButton("❌ Rejected", callback_data=f"greq#rej#{user_id}#{group_id}")
         ],
         [
-            InlineKeyboardButton("⚠️ Not Released", callback_data=f"reqAns#no#{user_id}#{chat_id}")
+            InlineKeyboardButton("⚠️ Not Released", callback_data=f"greq#nore#{user_id}#{group_id}")
         ]
     ]
 
     await client.send_message(
         chat_id=REQUEST_CHANNEL,
         text=admin_text,
-        reply_markup=InlineKeyboardMarkup(buttons)
+        reply_markup=InlineKeyboardMarkup(buttons),
+        disable_web_page_preview=True
     )
 
-@Client.on_callback_query(filters.regex(r"^reqAns"))
-async def request_action_callback(client, query):
-    data = query.data.split("#")
-    action = data[1]
-    user_id = int(data[2])
-    chat_id = int(data[3]) # Jis group se request aayi thi
-
-    # Admin message se movie name extract karna
+@Client.on_callback_query(filters.regex(r"^greq"))
+async def handle_group_request_status(client, query):
+    _, action, user_id, group_id = query.data.split("#")
+    user_id = int(user_id)
+    group_id = int(group_id)
+    
+    # Movie name nikalne ka try karte hain admin message se
     try:
-        movie_name = query.message.text.split("Request:** ")[1].split("\n")[0]
+        movie_name = query.message.text.split("Movie:** `")[1].split("`")[0]
     except:
-        movie_name = "Your Request"
+        movie_name = "Movie"
 
-    # Actions logic
     if action == "up":
-        status = "✅ <b>UPLOADED</b>"
-        user_msg = f"✅ <b>Congratulations!</b>\n\nMovie: <b>{movie_name}</b> upload kar di gayi hai.\nAb aap bot par search kar sakte hain."
-        
+        status_msg = f"✅ **Request Completed!**\n\nMovie: `{movie_name}`\nस्टेटस: अपलोड कर दी गई है! बॉट पर सर्च करें।"
+        admin_log = f"✅ Request Uploaded: {movie_name}"
     elif action == "rej":
-        status = "❌ <b>REJECTED</b>"
-        user_msg = f"❌ <b>Request Rejected</b>\n\nMovie: <b>{movie_name}</b> ki request reject kar di gayi hai.\n(Reason: Spam ya Unavailable)"
-        
-    elif action == "no":
-        status = "⚠️ <b>NOT RELEASED</b>"
-        user_msg = f"⚠️ <b>Not Released Yet</b>\n\nMovie: <b>{movie_name}</b> abhi release nahi hui hai ya high quality mein nahi hai."
+        status_msg = f"❌ **Request Rejected!**\n\nMovie: `{movie_name}`\nस्टेटस: रिजेक्ट कर दी गई है (Unavailable/Spam)."
+        admin_log = f"❌ Request Rejected: {movie_name}"
+    elif action == "nore":
+        status_msg = f"⚠️ **Not Released!**\n\nMovie: `{movie_name}`\nस्टेटस: अभी रिलीज़ नहीं हुई है या HD में नहीं है।"
+        admin_log = f"⚠️ Request Not Released: {movie_name}"
 
-    # User ko Group me notify karna
+    # User ko Group mein notification bhejo
     try:
         await client.send_message(
-            chat_id=chat_id,
-            text=f"{status}\n\nUser: <a href='tg://user?id={user_id}'>Friend</a>\n\n{user_msg}"
+            chat_id=group_id,
+            text=f"<a href='tg://user?id={user_id}'>👤</a> {status_msg}"
         )
-        await query.answer("Notification sent to user!")
+        await query.answer("User Notified in Group!")
     except Exception as e:
         await query.answer(f"Error: {e}", show_alert=True)
 
-    # Admin message edit karna
+    # Admin Msg Edit
     await query.message.edit_text(
-        f"{query.message.text}\n\n➖➖➖➖➖➖\nAction: {status} by {query.from_user.mention}",
+        query.message.text + f"\n\n➖➖➖➖➖\n{admin_log}",
         reply_markup=None
     )
 
-# ------------------ REQUEST MOVIE SYSTEM END ------------------
+# ---------------- GROUP REQUEST SYSTEM END ---------------- #
 
 @Client.on_message(
     filters.private & 
