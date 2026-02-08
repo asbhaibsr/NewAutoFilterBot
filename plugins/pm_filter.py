@@ -1246,7 +1246,7 @@ Search other bot
         try:
             await final_msg.delete()
         except:
-        pass
+            pass
         return
         
     SPELL_CHECK[msg.id] = movielist
