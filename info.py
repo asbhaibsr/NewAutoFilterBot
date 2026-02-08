@@ -1,5 +1,3 @@
-# info.py 
-
 import re
 from os import environ
 
@@ -57,6 +55,12 @@ FILE_STORE_CHANNEL = [int(ch) for ch in (environ.get('FILE_STORE_CHANNEL', '-100
 MELCOW_NEW_USERS = is_enabled((environ.get('MELCOW_NEW_USERS', "True")), True)
 PROTECT_CONTENT = is_enabled((environ.get('PROTECT_CONTENT', "False")), False)
 PUBLIC_FILE_STORE = is_enabled((environ.get('PUBLIC_FILE_STORE', "True")), True)
+
+# ============ NEW VARIABLE ADDED ============
+# Bot PM Username for link mode (without @)
+BOT_PM_USERNAME = environ.get("BOT_PM_USERNAME", "As_freefilterBot")
+# ============================================
+
 # Start AsfreefilterBot  
 
 LOG_STR = "Current Cusomized Configurations are:-\n"
@@ -68,3 +72,5 @@ LOG_STR += ("Long IMDB storyline enabled." if LONG_IMDB_DESCRIPTION else "LONG_I
 LOG_STR += ("Spell Check Mode Is Enabled, bot will be suggesting related movies if movie not found\n" if SPELL_CHECK_REPLY else "SPELL_CHECK_REPLY Mode disabled\n")
 LOG_STR += (f"MAX_LIST_ELM Found, long list will be shortened to first {MAX_LIST_ELM} elements\n" if MAX_LIST_ELM else "Full List of casts and crew will be shown in imdb template, restrict them by adding a value to MAX_LIST_ELM\n")
 LOG_STR += f"Your current IMDB template is {IMDB_TEMPLATE}"
+LOG_STR += f"\nLINK_MODE is {'ENABLED' if LINK_MODE else 'DISABLED'} (Bot will show links instead of buttons)"
+LOG_STR += f"\nBOT_PM_USERNAME is set to: @{BOT_PM_USERNAME}"
