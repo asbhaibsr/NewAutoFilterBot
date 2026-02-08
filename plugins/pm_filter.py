@@ -8,7 +8,7 @@ import pyrogram
 from database.connections_mdb import active_connection, all_connections, delete_connection, if_active, make_active, \
     make_inactive
 from info import ADMINS, AUTH_CHANNEL, AUTH_USERS, CUSTOM_FILE_CAPTION, AUTH_GROUPS, P_TTI_SHOW_OFF, IMDB, \
-    SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE
+    SINGLE_BUTTON, SPELL_CHECK_REPLY, IMDB_TEMPLATE, LINK_MODE
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait, UserIsBlocked, MessageNotModified, PeerIdInvalid
@@ -73,26 +73,41 @@ async def next_page(bot, query):
     if not files:
         return
     settings = await get_settings(query.message.chat.id)
-    if settings['button']:
+    
+    # LINK_MODE Logic (same as auto_filter)
+    pre = 'filep' if settings['file_secure'] else 'file'
+    if LINK_MODE:
+        # LINK_MODE True hai to Direct Link wala button banega
         btn = [
             [
-                # Added file emoji and size in single button mode
                 InlineKeyboardButton(
-                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'files#{file.file_id}'
+                    text=f"📂 {get_size(file.file_size)} | {file.file_name}",
+                    url=f"https://t.me/{temp.U_NAME}?start=file_{file.file_id}"
+                ),
+            ]
+            for file in files
+        ]
+    elif settings["button"]:
+        # Agar Button Mode (Single Button) hai
+        btn = [
+            [
+                InlineKeyboardButton(
+                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'{pre}#{file.file_id}'
                 ),
             ]
             for file in files
         ]
     else:
+        # Agar Double Button hai
         btn = [
             [
                 InlineKeyboardButton(
-                    text=f"{file.file_name}", callback_data=f'files#{file.file_id}'
+                    text=f"{file.file_name}",
+                    callback_data=f'{pre}#{file.file_id}',
                 ),
-                # Added file emoji in size button
                 InlineKeyboardButton(
                     text=f"📁 {get_size(file.file_size)}",
-                    callback_data=f'files_#{file.file_id}',
+                    callback_data=f'{pre}#{file.file_id}',
                 ),
             ]
             for file in files
@@ -108,21 +123,32 @@ async def next_page(bot, query):
     # Add PM button to the last page with new text
     pm_button = [InlineKeyboardButton("(⋆. 𐙚˚࿔ 𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 𝘁𝗼 𝗴𝗲𝘁 𝘁𝗵𝗲 𝗳𝗶𝗹𝗲 ᯓᡣ𐭩˚⋆)", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
+    # IMPROVEMENT: If only one page exists, show "No More Pages" instead of page numbers
+    total_pages = math.ceil(total / 10)
+    current_page = math.ceil(int(offset) / 10) + 1
+    
     if n_offset == 0:
-        btn.append(
-            [InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
-             InlineKeyboardButton(f"📃 Pages {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}",
-                                  callback_data="pages")]
-        )
+        # This means no next page exists
+        if off_set is None:
+            # Only one page exists
+            btn.append(
+                [InlineKeyboardButton("🚫 𝗡𝗼 𝗠𝗼𝗿𝗲 𝗣𝗮𝗴𝗲𝘀 🚫", callback_data="pages")]
+            )
+        else:
+            btn.append(
+                [InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
+                 InlineKeyboardButton(f"📃 Pages {current_page} / {total_pages}",
+                                      callback_data="pages")]
+            )
     elif off_set is None:
         btn.append(
-            [InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
+            [InlineKeyboardButton(f"📃 Pages {current_page} / {total_pages}", callback_data="pages"),
              InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")])
     else:
         btn.append(
             [
                 InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
-                InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
+                InlineKeyboardButton(f"📃 Pages {current_page} / {total_pages}", callback_data="pages"),
                 InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")
             ],
         )
@@ -893,7 +919,21 @@ Search other bot
         search, files, offset, total_results = spoll
         
     pre = 'filep' if settings['file_secure'] else 'file'
-    if settings["button"]:
+    
+    # ---------- LINK_MODE LOGIC ADDED HERE ----------
+    if LINK_MODE:
+        # Agar LINK_MODE True hai to Direct Link wala button banega
+        btn = [
+            [
+                InlineKeyboardButton(
+                    text=f"📂 {get_size(file.file_size)} | {file.file_name}",
+                    url=f"https://t.me/{temp.U_NAME}?start=file_{file.file_id}"
+                ),
+            ]
+            for file in files
+        ]
+    elif settings["button"]:
+        # Agar Button Mode (Single Button) hai
         btn = [
             [
                 InlineKeyboardButton(
@@ -903,6 +943,7 @@ Search other bot
             for file in files
         ]
     else:
+        # Agar Double Button hai
         btn = [
             [
                 InlineKeyboardButton(
@@ -916,21 +957,34 @@ Search other bot
             ]
             for file in files
         ]
+    # ------------------------------------------------
 
     # Add PM button with updated text
     pm_button = [InlineKeyboardButton("(⋆. 𐙚˚࿔ 𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 𝘁𝗼 𝗴𝗲𝘁 𝘁𝗵𝗲 𝗳𝗶𝗹𝗲 ᯓᡣ𐭩˚⋆)", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
+    # IMPROVEMENT: If only one page exists, show "No More Pages" instead of page numbers
+    total_pages = math.ceil(int(total_results) / 10) if total_results else 1
+    current_page = math.ceil(int(offset) / 10) + 1
+    
     if offset != "":
         key = f"{message.chat.id}-{message.id}"
         BUTTONS[key] = search
         req = message.from_user.id if message.from_user else 0
-        btn.append(
-            [InlineKeyboardButton(text=f"🗓 1/{math.ceil(int(total_results) / 10)}", callback_data="pages"),
-             InlineKeyboardButton(text="NEXT ⏩", callback_data=f"next_{req}_{key}_{offset}")]
-        )
+        
+        # Check if this is the only page
+        if total_pages == 1:
+            btn.append(
+                [InlineKeyboardButton("🚫 𝗡𝗼 𝗠𝗼𝗿𝗲 𝗣𝗮𝗴𝗲𝘀 🚫", callback_data="pages")]
+            )
+        else:
+            btn.append(
+                [InlineKeyboardButton(text=f"📃 Pages {current_page}/{total_pages}", callback_data="pages"),
+                 InlineKeyboardButton(text="NEXT ⏩", callback_data=f"next_{req}_{key}_{offset}")]
+            )
     else:
+        # Only one page exists
         btn.append(
-            [InlineKeyboardButton(text="🗓 1/1", callback_data="pages")]
+            [InlineKeyboardButton("🚫 𝗡𝗼 𝗠𝗼𝗿𝗲 𝗣𝗮𝗴𝗲𝘀 🚫", callback_data="pages")]
         )
     
     # Add PM button to the last row
