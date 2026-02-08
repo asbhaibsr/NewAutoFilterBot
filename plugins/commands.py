@@ -9,7 +9,7 @@ from pyrogram.errors import ChatAdminRequired, FloodWait, PeerIdInvalid, Channel
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from database.ia_filterdb import Media, get_file_details, unpack_new_file_id
 from database.users_chats_db import db
-from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT
+from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT, REQUEST_CHANNEL
 from utils import get_settings, get_size, is_subscribed, save_group_settings, temp
 from database.connections_mdb import active_connection
 import re
@@ -324,7 +324,7 @@ async def other_bots_callback(client, query):
     buttons = []
     nav_buttons = []
     if page_index > 0:
-        nav_buttons.append(InlineKeyboardButton(f"⬅️ ᴘɪᴄʜʜʟᴀ", callback_data=f"other_bots_{page_index-1}"))
+        nav_buttons.append(InlineKeyboardButton(f"⬅️ ᴘɪᴄʜʟᴀ", callback_data=f"other_bots_{page_index-1}"))
     
     if page_index < len(BOTS_PAGES) - 1:
         nav_buttons.append(InlineKeyboardButton(f"ᴀɢʟᴀ ➡️", callback_data=f"other_bots_{page_index+1}"))
@@ -369,7 +369,7 @@ async def start_back_callback(client, query):
     except Exception as e:
         logger.error(f"Error in start_back_callback: {e}")
 
-# ---------------- REQUEST MOVIE SYSTEM START ---------------- #
+# ---------------- REQUEST MOVIE SYSTEM START ----------------
 
 @Client.on_callback_query(filters.regex("request_movie"))
 async def request_movie_click(client, query):
@@ -467,7 +467,99 @@ async def handle_request_status(client, query):
     )
     await query.answer("User notified!")
 
-# ---------------- REQUEST MOVIE SYSTEM END ---------------- #
+# ------------------ REQUEST MOVIE SYSTEM START ------------------
+
+@Client.on_message(filters.command("request") | filters.regex(r"^#request"))
+async def request_handler(client, message):
+    if len(message.command) < 2:
+        return await message.reply_text("⚠️ <b>Movie/Series ka naam likhna jaruri hai!</b>\n\nExample:\n<code>/request Pushpa 2</code>\n<code>#request Mirzapur</code>")
+
+    # Request content nikalna
+    if message.text.startswith("/request"):
+        request_text = message.text.split(" ", 1)[1]
+    else:
+        request_text = message.text.split(" ", 1)[1]
+
+    user_id = message.from_user.id
+    user_mention = message.from_user.mention
+    chat_id = message.chat.id
+    
+    # Stylist Message for User
+    success_text = (
+        "📩 <b>Aapki Request Owner ke pass bhej di gyi hai.</b>\n\n"
+        "Jab owner request ko dekhenge to aapko yahan notification mil jayegi.\n"
+        "Admin apne kaam main busy bhi rah sakte hai to thoda intzaar karein. ❤️"
+    )
+    
+    await message.reply_text(success_text)
+
+    # Admin/Owner Group Message with Buttons
+    admin_text = (
+        "🔔 <b>New Movie Request!</b>\n\n"
+        f"👤 <b>User:</b> {user_mention} (`{user_id}`)\n"
+        f"🎬 <b>Request:</b> {request_text}\n"
+        f"🏘 <b>Group ID:</b> `{chat_id}`"
+    )
+
+    buttons = [
+        [
+            InlineKeyboardButton("✅ Uploaded", callback_data=f"reqAns#up#{user_id}#{chat_id}"),
+            InlineKeyboardButton("❌ Rejected", callback_data=f"reqAns#rej#{user_id}#{chat_id}")
+        ],
+        [
+            InlineKeyboardButton("⚠️ Not Released", callback_data=f"reqAns#no#{user_id}#{chat_id}")
+        ]
+    ]
+
+    await client.send_message(
+        chat_id=REQUEST_CHANNEL,
+        text=admin_text,
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+@Client.on_callback_query(filters.regex(r"^reqAns"))
+async def request_action_callback(client, query):
+    data = query.data.split("#")
+    action = data[1]
+    user_id = int(data[2])
+    chat_id = int(data[3]) # Jis group se request aayi thi
+
+    # Admin message se movie name extract karna
+    try:
+        movie_name = query.message.text.split("Request:** ")[1].split("\n")[0]
+    except:
+        movie_name = "Your Request"
+
+    # Actions logic
+    if action == "up":
+        status = "✅ <b>UPLOADED</b>"
+        user_msg = f"✅ <b>Congratulations!</b>\n\nMovie: <b>{movie_name}</b> upload kar di gayi hai.\nAb aap bot par search kar sakte hain."
+        
+    elif action == "rej":
+        status = "❌ <b>REJECTED</b>"
+        user_msg = f"❌ <b>Request Rejected</b>\n\nMovie: <b>{movie_name}</b> ki request reject kar di gayi hai.\n(Reason: Spam ya Unavailable)"
+        
+    elif action == "no":
+        status = "⚠️ <b>NOT RELEASED</b>"
+        user_msg = f"⚠️ <b>Not Released Yet</b>\n\nMovie: <b>{movie_name}</b> abhi release nahi hui hai ya high quality mein nahi hai."
+
+    # User ko Group me notify karna
+    try:
+        await client.send_message(
+            chat_id=chat_id,
+            text=f"{status}\n\nUser: <a href='tg://user?id={user_id}'>Friend</a>\n\n{user_msg}"
+        )
+        await query.answer("Notification sent to user!")
+    except Exception as e:
+        await query.answer(f"Error: {e}", show_alert=True)
+
+    # Admin message edit karna
+    await query.message.edit_text(
+        f"{query.message.text}\n\n➖➖➖➖➖➖\nAction: {status} by {query.from_user.mention}",
+        reply_markup=None
+    )
+
+# ------------------ REQUEST MOVIE SYSTEM END ------------------
 
 @Client.on_message(
     filters.private & 
