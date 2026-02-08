@@ -40,6 +40,8 @@ COLLECTION_NAME = environ.get('COLLECTION_NAME', 'Telegram_files')
 
 # Others
 LOG_CHANNEL = int(environ.get('LOG_CHANNEL', -1002352329534))
+REQUEST_CHANNEL = int(environ.get('REQUEST_CHANNEL', LOG_CHANNEL)) # Agar alag channel id nahi dali to Log channel main jayega
+LINK_MODE = is_enabled((environ.get('LINK_MODE', "True")), True) # True hone par Link banega, False par File Button
 SUPPORT_CHAT = environ.get('SUPPORT_CHAT', 'aschat_group')
 P_TTI_SHOW_OFF = is_enabled((environ.get('P_TTI_SHOW_OFF', "True")), True)
 IMDB = is_enabled((environ.get('IMDB', "False")), False)
