@@ -73,41 +73,26 @@ async def next_page(bot, query):
     if not files:
         return
     settings = await get_settings(query.message.chat.id)
-    
-    # LINK_MODE Logic (same as auto_filter)
-    pre = 'filep' if settings['file_secure'] else 'file'
-    if LINK_MODE:
-        # LINK_MODE True hai to Direct Link wala button banega
+    if settings['button']:
         btn = [
             [
+                # Added file emoji and size in single button mode
                 InlineKeyboardButton(
-                    text=f"📂 {get_size(file.file_size)} | {file.file_name}",
-                    url=f"https://t.me/{temp.U_NAME}?start=file_{file.file_id}"
-                ),
-            ]
-            for file in files
-        ]
-    elif settings["button"]:
-        # Agar Button Mode (Single Button) hai
-        btn = [
-            [
-                InlineKeyboardButton(
-                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'{pre}#{file.file_id}'
+                    text=f"[📁 {get_size(file.file_size)}] {file.file_name}", callback_data=f'files#{file.file_id}'
                 ),
             ]
             for file in files
         ]
     else:
-        # Agar Double Button hai
         btn = [
             [
                 InlineKeyboardButton(
-                    text=f"{file.file_name}",
-                    callback_data=f'{pre}#{file.file_id}',
+                    text=f"{file.file_name}", callback_data=f'files#{file.file_id}'
                 ),
+                # Added file emoji in size button
                 InlineKeyboardButton(
                     text=f"📁 {get_size(file.file_size)}",
-                    callback_data=f'{pre}#{file.file_id}',
+                    callback_data=f'files_#{file.file_id}',
                 ),
             ]
             for file in files
@@ -123,32 +108,21 @@ async def next_page(bot, query):
     # Add PM button to the last page with new text
     pm_button = [InlineKeyboardButton("(⋆. 𐙚˚࿔ 𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 𝘁𝗼 𝗴𝗲𝘁 𝘁𝗵𝗲 𝗳𝗶𝗹𝗲 ᯓᡣ𐭩˚⋆)", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
-    # IMPROVEMENT: If only one page exists, show "No More Pages" instead of page numbers
-    total_pages = math.ceil(total / 10)
-    current_page = math.ceil(int(offset) / 10) + 1
-    
     if n_offset == 0:
-        # This means no next page exists
-        if off_set is None:
-            # Only one page exists
-            btn.append(
-                [InlineKeyboardButton("🚫 𝗡𝗼 𝗠𝗼𝗿𝗲 𝗣𝗮𝗴𝗲𝘀 🚫", callback_data="pages")]
-            )
-        else:
-            btn.append(
-                [InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
-                 InlineKeyboardButton(f"📃 Pages {current_page} / {total_pages}",
-                                      callback_data="pages")]
-            )
+        btn.append(
+            [InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
+             InlineKeyboardButton(f"📃 Pages {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}",
+                                  callback_data="pages")]
+        )
     elif off_set is None:
         btn.append(
-            [InlineKeyboardButton(f"📃 Pages {current_page} / {total_pages}", callback_data="pages"),
+            [InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
              InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")])
     else:
         btn.append(
             [
                 InlineKeyboardButton("⏪ BACK", callback_data=f"next_{req}_{key}_{off_set}"),
-                InlineKeyboardButton(f"📃 Pages {current_page} / {total_pages}", callback_data="pages"),
+                InlineKeyboardButton(f"🗓 {math.ceil(int(offset) / 10) + 1} / {math.ceil(total / 10)}", callback_data="pages"),
                 InlineKeyboardButton("NEXT ⏩", callback_data=f"next_{req}_{key}_{n_offset}")
             ],
         )
@@ -327,7 +301,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
         hr = await client.get_chat(int(group_id))
 
         title = hr.title
-
         user_id = query.from_user.id
 
         mkact = await make_active(str(user_id), str(group_id))
@@ -917,23 +890,37 @@ Search other bot
         # If it's a result from spell check
         settings = await get_settings(message.chat.id)
         search, files, offset, total_results = spoll
-        
+    
     pre = 'filep' if settings['file_secure'] else 'file'
     
-    # ---------- LINK_MODE LOGIC ADDED HERE ----------
+    # ============ LINK MODE VS BUTTON MODE CODE START ============
+    
+    # Agar Link Mode ON hai (Info.py se)
     if LINK_MODE:
-        # Agar LINK_MODE True hai to Direct Link wala button banega
-        btn = [
-            [
-                InlineKeyboardButton(
-                    text=f"📂 {get_size(file.file_size)} | {file.file_name}",
-                    url=f"https://t.me/{temp.U_NAME}?start=file_{file.file_id}"
-                ),
-            ]
-            for file in files
-        ]
-    elif settings["button"]:
-        # Agar Button Mode (Single Button) hai
+        msg_text = f"📂 **Results for:** `{search}`\n\n"
+
+        for file in files:
+            # Deep Link Generator
+            link = f"https://t.me/{temp.U_NAME}?start={pre}_{file.file_id}"
+
+            # Text Format: 🎥 Movie Name [Size]
+            msg_text += f"🎥 <a href='{link}'>{file.file_name}</a>\n💾 Size: {get_size(file.file_size)}\n\n"
+
+        msg_text += f"⚡ Powered by {temp.B_NAME}"
+
+        # Poster ke sath ya bina poster ke bhejna
+        imdb = await get_poster(search, file=(files[0]).file_name) if settings["imdb"] else None
+
+        if imdb and imdb.get('poster'):
+            await message.reply_photo(photo=imdb.get('poster'), caption=msg_text[:1024])
+        else:
+            await message.reply_text(msg_text, disable_web_page_preview=True)
+        return # Yahan se wapas laut jayenge, niche ka button code run nahi hoga
+    
+    # ============ LINK MODE VS BUTTON MODE CODE END ============
+    
+    # Agar Link Mode OFF hai (Button Mode)
+    if settings["button"]:
         btn = [
             [
                 InlineKeyboardButton(
@@ -943,7 +930,6 @@ Search other bot
             for file in files
         ]
     else:
-        # Agar Double Button hai
         btn = [
             [
                 InlineKeyboardButton(
@@ -957,34 +943,21 @@ Search other bot
             ]
             for file in files
         ]
-    # ------------------------------------------------
 
     # Add PM button with updated text
     pm_button = [InlineKeyboardButton("(⋆. 𐙚˚࿔ 𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 𝘁𝗼 𝗴𝗲𝘁 𝘁𝗵𝗲 𝗳𝗶𝗹𝗲 ᯓᡣ𐭩˚⋆)", url=f"https://t.me/{BOT_PM_USERNAME}")]
 
-    # IMPROVEMENT: If only one page exists, show "No More Pages" instead of page numbers
-    total_pages = math.ceil(int(total_results) / 10) if total_results else 1
-    current_page = math.ceil(int(offset) / 10) + 1
-    
     if offset != "":
         key = f"{message.chat.id}-{message.id}"
         BUTTONS[key] = search
         req = message.from_user.id if message.from_user else 0
-        
-        # Check if this is the only page
-        if total_pages == 1:
-            btn.append(
-                [InlineKeyboardButton("🚫 𝗡𝗼 𝗠𝗼𝗿𝗲 𝗣𝗮𝗴𝗲𝘀 🚫", callback_data="pages")]
-            )
-        else:
-            btn.append(
-                [InlineKeyboardButton(text=f"📃 Pages {current_page}/{total_pages}", callback_data="pages"),
-                 InlineKeyboardButton(text="NEXT ⏩", callback_data=f"next_{req}_{key}_{offset}")]
-            )
-    else:
-        # Only one page exists
         btn.append(
-            [InlineKeyboardButton("🚫 𝗡𝗼 𝗠𝗼𝗿𝗲 𝗣𝗮𝗴𝗲𝘀 🚫", callback_data="pages")]
+            [InlineKeyboardButton(text=f"🗓 1/{math.ceil(int(total_results) / 10)}", callback_data="pages"),
+             InlineKeyboardButton(text="NEXT ⏩", callback_data=f"next_{req}_{key}_{offset}")]
+        )
+    else:
+        btn.append(
+            [InlineKeyboardButton(text="🗓 1/1", callback_data="pages")]
         )
     
     # Add PM button to the last row
